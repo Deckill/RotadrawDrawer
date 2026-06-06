@@ -60,6 +60,7 @@ body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; he
   <button class="tb-btn" onclick="document.getElementById('img-input').click()">이미지 불러오기</button>
   <div id="tb-right">
     <button class="tb-btn" onclick="saveProject()">저장</button>
+    <button class="tb-btn" onclick="saveProjectAs()">다른 이름으로 저장</button>
     <button class="tb-btn" onclick="loadProject()">불러오기</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="showExportModal()">내보내기</button>
@@ -84,16 +85,46 @@ body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; he
       <button class="tb-btn" style="width:100%;margin-top:5px" onclick="goHome()">원점 복귀 (Home)</button>
       <div class="panel-title" style="margin-top:10px">원</div>
       <div class="input-row"><label>지름(mm)</label><input type="number" id="circle-d" value="150" min="5" max="2000" step="0.5" oninput="circleFromInput()"></div>
+      <div class="panel-title" style="margin-top:10px">이미지 불투명도</div>
+      <div class="input-row">
+        <input type="range" id="img-opacity-range" min="0.05" max="1" step="0.05" value="1" oninput="onImgOpacity(this.value)">
+        <input type="number" id="img-opacity-num" value="1.00" min="0.05" max="1" step="0.05" style="width:52px;flex:none" oninput="onImgOpacityNum(this.value)">
+      </div>
+      <div class="panel-title" style="margin-top:10px">도형 크기</div>
+      <div class="input-row">
+        <input type="range" id="shape-scale-range" min="10" max="300" step="1" value="100" oninput="onShapeScaleRange(this.value)" onchange="onShapeScaleChange()">
+        <input type="number" id="shape-scale-num" value="100" min="10" max="300" step="1" style="width:52px;flex:none" oninput="onShapeScaleNum(this.value)" onchange="onShapeScaleChange()">
+        <span style="font-size:11px;color:#aaa">%</span>
+      </div>
+      <div class="panel-title" style="margin-top:10px">선택된 사진 크기</div>
+      <div class="input-row">
+        <input type="range" id="img-width-range" min="10" max="1000" step="1" value="100" oninput="onImgWidthRange(this.value)" onchange="onImgWidthChange()">
+        <input type="number" id="img-width-num" value="100" min="10" max="1000" step="1" style="width:52px;flex:none" oninput="onImgWidthNum(this.value)" onchange="onImgWidthChange()">
+        <span style="font-size:11px;color:#aaa">mm</span>
+      </div>
     </div>
     <div class="panel-section" id="panel-draw" style="display:none">
       <div class="panel-title">도구</div>
       <button class="panel-btn active" id="tool-spline" onclick="setDrawTool('spline')">맞춤점 스플라인</button>
+      <div id="spline-algo-container" style="margin: 5px 0; padding: 4px; background: #1a1a1c; border-radius: 4px;">
+        <div style="font-size: 10px; color: #8e8e93; margin-bottom: 4px;">스플라인 종류:</div>
+        <div style="display: flex; gap: 4px;">
+          <button class="panel-btn active" id="algo-natural" onclick="setSplineAlgo('natural')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;">글로벌</button>
+          <button class="panel-btn" id="algo-catmull" onclick="setSplineAlgo('catmull')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;">캣물</button>
+          <button class="panel-btn" id="algo-bspline" onclick="setSplineAlgo('bspline')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;">B-스플라인</button>
+        </div>
+      </div>
       <button class="panel-btn" id="tool-line" onclick="setDrawTool('line')">직선</button>
       <button class="panel-btn" id="tool-select" onclick="setDrawTool('select')">선택 / 이동</button>
       <div class="panel-title" style="margin-top:8px">두께 (mm)</div>
       <div class="input-row">
         <input type="range" id="sw-range" min="0.5" max="2" step="0.05" value="1" oninput="onSwRange(this.value)">
         <input type="number" id="sw-num" value="1.00" min="0.5" max="2" step="0.05" style="width:52px;flex:none" oninput="onSwNum(this.value)">
+      </div>
+      <div class="panel-title" style="margin-top:8px">도형 불투명도</div>
+      <div class="input-row">
+        <input type="range" id="shape-opacity-range" min="0.05" max="1" step="0.05" value="1" oninput="onShapeOpacity(this.value)">
+        <input type="number" id="shape-opacity-num" value="1.00" min="0.05" max="1" step="0.05" style="width:52px;flex:none" oninput="onShapeOpacityNum(this.value)">
       </div>
       <div style="display:flex;gap:4px;margin-top:8px">
         <button class="panel-btn" style="flex:1;margin:0" onclick="deleteSelectedShape()">삭제</button>
@@ -158,6 +189,7 @@ body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; he
 </div>
 <div id="context-menu" style="display:none; position:fixed; background:#16213e; border:1px solid #0f3460; border-radius:4px; padding:4px; z-index:1001; box-shadow:0 4px 6px rgba(0,0,0,0.5);"></div>
 <script>
+// --- globals.js --- 
 'use strict';
 // ═══════════════════════════════════════════════
 //  CONSTANTS
@@ -209,6 +241,64 @@ let selShapeId = null, selPtIdx = null;
 // Which handle is active: null | 'in' | 'out'
 let selHandle  = null;
 let dragState  = null;  // { type:'pt'|'shape'|'cpIn'|'cpOut', ... }
+// Undo / Redo
+let undoStack = [], redoStack = [];
+const MAX_UNDO = 20;
+let currentFileHandle = null;
+let shapesTransform = { cx: 0, cy: 0, w: 0, h: 0, rotation: 0 };
+let transformStartShapes = null;
+let lastShapeScaleValue = 100;
+function _snapState() {
+  return JSON.stringify({
+    shapes: JSON.parse(JSON.stringify(shapes)),
+    groups: JSON.parse(JSON.stringify(groups)),
+    circle: {...circle},
+    canvasW, canvasH, baseW, baseH,
+    labels: JSON.parse(JSON.stringify(labels)),
+    strokeWidth, nextShapeId, nextGroupId,
+    paperGuide: JSON.parse(JSON.stringify(paperGuide))
+  });
+}
+function saveSnapshot() {
+  const s = _snapState();
+  if (undoStack.length > 0 && undoStack[undoStack.length-1] === s) return;
+  undoStack.push(s);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+}
+function _applySnap(snap) {
+  const d = JSON.parse(snap);
+  shapes = d.shapes; groups = d.groups; circle = d.circle;
+  canvasW = d.canvasW; canvasH = d.canvasH;
+  baseW = d.baseW||canvasW; baseH = d.baseH||canvasH;
+  labels = d.labels||{}; strokeWidth = d.strokeWidth;
+  nextShapeId = d.nextShapeId; nextGroupId = d.nextGroupId;
+  if (d.paperGuide) Object.assign(paperGuide, d.paperGuide);
+  selShapeId=null; selPtIdx=null; dragState=null;
+  arrSelShapeId=null; arrDragState=null;
+  try {
+    document.getElementById('cv-w').value = canvasW;
+    document.getElementById('cv-h').value = canvasH;
+    document.getElementById('circle-d').value = (circle.r*2).toFixed(1);
+    document.getElementById('sw-num').value = strokeWidth.toFixed(2);
+    document.getElementById('sw-range').value = strokeWidth;
+  } catch(e2) {}
+  refreshGroupList();
+  setCanvasSize();
+  render();
+}
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(_snapState());
+  if (redoStack.length > MAX_UNDO) redoStack.shift();
+  _applySnap(undoStack.pop());
+}
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(_snapState());
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  _applySnap(redoStack.pop());
+}
 // Arrange
 let arrSelShapeId = null, arrDragState = null;
 // Hover
@@ -228,21 +318,12 @@ const wrapper    = document.getElementById('canvas-wrapper');
 const canvasArea = document.getElementById('canvas-area');
 function S(mm)  { return mm * MM * viewScale; }
 function clientToMm(e) {
-  const r = mainCanvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left)/(MM*viewScale), y: (e.clientY - r.top)/(MM*viewScale) };
+  // viewport 기반 캔버스: canvasArea 기준 + viewOffX/Y 보정
+  const r = canvasArea.getBoundingClientRect();
+  return { x: (e.clientX - r.left - viewOffX)/(MM*viewScale), y: (e.clientY - r.top - viewOffY)/(MM*viewScale) };
 }
-function setCanvasSize() {
-  const pw = Math.max(1, Math.round(canvasW*MM*viewScale));
-  const ph = Math.max(1, Math.round(canvasH*MM*viewScale));
-  bgCanvas.width  = mainCanvas.width  = pw;
-  bgCanvas.height = mainCanvas.height = ph;
-  bgCanvas.style.width  = mainCanvas.style.width  = pw+'px';
-  bgCanvas.style.height = mainCanvas.style.height = ph+'px';
-  wrapper.style.width  = pw+'px';
-  wrapper.style.height = ph+'px';
-  wrapper.style.left   = viewOffX+'px';
-  wrapper.style.top    = viewOffY+'px';
-}
+
+let _zoomRaf = null;
 canvasArea.addEventListener('wheel', e => {
   e.preventDefault();
   const f = e.deltaY < 0 ? 1.1 : 0.9;
@@ -253,212 +334,260 @@ canvasArea.addEventListener('wheel', e => {
   viewOffX = mx - (mx-viewOffX)*ratio;
   viewOffY = my - (my-viewOffY)*ratio;
   viewScale = ns;
-  setCanvasSize(); render();
+  // 캔버스 크기는 뷰포트 고정 - RAF로 render만 호출
+  if (!_zoomRaf) {
+    _zoomRaf = requestAnimationFrame(() => {
+      _zoomRaf = null;
+      render();
+    });
+  }
 }, { passive:false });
 let _pan=false, _panO=null;
 canvasArea.addEventListener('mousedown', e => { if(e.button===1){_pan=true;_panO={x:e.clientX-viewOffX,y:e.clientY-viewOffY};e.preventDefault();} });
-window.addEventListener('mousemove', e => { if(_pan){viewOffX=e.clientX-_panO.x;viewOffY=e.clientY-_panO.y;wrapper.style.left=viewOffX+'px';wrapper.style.top=viewOffY+'px';} });
-window.addEventListener('mouseup',   e => { if(e.button===1)_pan=false; });
-// ═══════════════════════════════════════════════
-//  CANVAS SIZE CONTROLS
-// ═══════════════════════════════════════════════
-function onPaperSizeChange(val) {
-  if (val === 'Custom') {
-    document.getElementById('cv-w').disabled = false;
-    document.getElementById('cv-h').disabled = false;
-  } else {
-    document.getElementById('cv-w').disabled = true;
-    document.getElementById('cv-h').disabled = true;
-    if (val === 'A4') { paperGuide.w = 210; paperGuide.h = 297; }
-    else if (val === 'A3') { paperGuide.w = 297; paperGuide.h = 420; }
-    else if (val === 'Letter') { paperGuide.w = 215.9; paperGuide.h = 279.4; }
-    document.getElementById('cv-w').value = paperGuide.w;
-    document.getElementById('cv-h').value = paperGuide.h;
-  }
-  paperGuide.size = val;
-  canvasW = paperGuide.w;
-  canvasH = paperGuide.h;
-  paperGuide.cx = canvasW / 2;
-  paperGuide.cy = canvasH / 2;
-  paperGuide.rotation = 0;
-  circle.cx = canvasW / 2;
-  circle.cy = canvasH / 2;
-  setCanvasSize();
-  render();
-}
-function onCustomPaperWH(axis, val) {
-  const v = parseFloat(val);
-  if (!isNaN(v) && v > 0) {
-    if (axis === 'w') { paperGuide.w = v; canvasW = v; }
-    if (axis === 'h') { paperGuide.h = v; canvasH = v; }
-    paperGuide.cx = canvasW / 2;
-    paperGuide.cy = canvasH / 2;
-    paperGuide.rotation = 0;
-    circle.cx = canvasW / 2;
-    circle.cy = canvasH / 2;
-    setCanvasSize();
-    render();
-  }
-}
-function goHome() {
-  const ar = canvasArea.getBoundingClientRect();
-  if (ar.width > 0 && ar.height > 0) {
-    viewScale = Math.min((ar.width - 60) / (paperGuide.w * MM), (ar.height - 60) / (paperGuide.h * MM), 2);
-    viewOffX = (ar.width - paperGuide.w * MM * viewScale) / 2;
-    viewOffY = (ar.height - paperGuide.h * MM * viewScale) / 2;
-    wrapper.style.left = viewOffX + 'px';
-    wrapper.style.top = viewOffY + 'px';
-    render();
-  }
-}
-function importImage(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => onImageObjectLoaded(img);
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-function onImageObjectLoaded(img) {
-  // Load image at 60% of paper guide size to show it is a selectable object
-  let w = paperGuide.w * 0.6;
-  let h = w * img.height / img.width;
-  if (h > paperGuide.h * 0.6) {
-    h = paperGuide.h * 0.6;
-    w = h * img.width / img.height;
-  }
-  images.push({
-    id: nextImgId++,
-    img: img,
-    cx: paperGuide.cx,
-    cy: paperGuide.cy,
-    w: w,
-    h: h,
-    rotation: 0
-  });
-  render();
-}
-// Handle file dropping for images
-document.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-document.addEventListener('drop', e => {
-  e.preventDefault();
-  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-    const file = e.dataTransfer.files[0];
-    if (file.type.startsWith('image/')) {
-      importImage(file);
-    } else if (file.name.endsWith('.json') || file.name.endsWith('.rdraw')) {
-      onProjectLoaded({target:{files:[file]}});
-    }
-  }
-});
-function circleFromInput() { circle.r=(parseFloat(document.getElementById('circle-d').value)||150)/2; render(); }
+
+
 // ═══════════════════════════════════════════════
 //  GROUPS
 // ═══════════════════════════════════════════════
 const GCOLORS=['#e94560','#00b4d8','#06d6a0','#ffd166','#a855f7','#f97316','#ec4899','#14b8a6','#84cc16','#f43f5e'];
-function initDefaultGroup() {
-  groups=[{id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true}];
-  activeDrawGroupId=GROUP1_ID;
-}
-function addGroup() {
-  const g={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:0,locked:false};
-  groups.push(g); refreshGroupList(); render();
-}
-function deleteGroup(id) {
-  if(id===GROUP1_ID)return;
-  shapes=shapes.filter(s=>!(s.groupId===id&&s._isCopy));
-  groups=groups.filter(g=>g.id!==id);
-  refreshGroupList(); render();
-}
+
+
+
 // Copy system
-function hasCopy(origId)  { return shapes.some(s=>s._origId===origId); }
-function makeCopy(orig, targetGid) {
-  shapes=shapes.filter(s=>!(s._origId===orig.id&&s.groupId===targetGid));
-  const c=JSON.parse(JSON.stringify(orig));
-  c.id=nextShapeId++; c._isCopy=true; c._origId=orig.id; c.groupId=targetGid;
-  shapes.push(c); return c;
-}
-function removeCopy(origId, targetGid) { shapes=shapes.filter(s=>!(s._origId===origId&&s.groupId===targetGid)); }
-function refreshGroupList() {
-  // Arrange list
-  const list=document.getElementById('group-list');
-  list.innerHTML='';
-  groups.forEach(g=>{
-    const d=document.createElement('div');
-    d.className='group-item';
-    const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
-    d.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1">그룹 ${g.label}</span><input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">${delHtml}`;
-    list.appendChild(d);
-  });
-  // Label panel
-  const ll=document.getElementById('label-group-list');
-  ll.innerHTML='';
-  groups.forEach(g=>{
-    const row=document.createElement('div');
-    row.className='input-row';
-    row.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1;font-size:12px">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
-    ll.appendChild(row);
-  });
-}
-function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render();}}
+
+
+
+
+
 // ═══════════════════════════════════════════════
 //  STROKE WIDTH
 // ═══════════════════════════════════════════════
-function onSwRange(v){
-  strokeWidth=parseFloat(v);
-  document.getElementById('sw-num').value=strokeWidth.toFixed(2);
-  shapes.forEach(s=>s.strokeWidth=strokeWidth);
-  render();
-}
-function onSwNum(v){
-  strokeWidth=Math.max(0.5,Math.min(2,parseFloat(v)||1));
-  document.getElementById('sw-range').value=strokeWidth;
-  shapes.forEach(s=>s.strokeWidth=strokeWidth);
-  render();
-}
+
+
 // ═══════════════════════════════════════════════
 //  MODES
 // ═══════════════════════════════════════════════
 const MODE_NAMES={canvas:'캔버스',draw:'그리기',arrange:'배치',label:'레이블'};
-function setMode(m){
-  if(drawing)finishDrawing();
-  currentMode=m;
-  ['canvas','draw','arrange','label'].forEach(mm=>{
-    document.getElementById('mode-'+mm).classList.toggle('active',mm===m);
-    const p=document.getElementById('panel-'+mm);if(p)p.style.display=mm===m?'':'none';
-  });
-  document.getElementById('sb-mode').textContent='모드: '+MODE_NAMES[m];
-  selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;
-  arrSelShapeId=null;arrDragState=null;hoverPtRef=null;lblDrag=null;
-  updateCursor();render();
-}
-function setDrawTool(t){
-  if(drawing)finishDrawing();
-  drawTool=t;
-  ['spline','line','select'].forEach(tt=>document.getElementById('tool-'+tt).classList.toggle('active',tt===t));
-  selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;hoverPtRef=null;
-  updateCursor();render();
-}
-function updateCursor(){
-  if(currentMode==='draw'&&drawTool!=='select')mainCanvas.style.cursor='crosshair';
-  else mainCanvas.style.cursor='default';
-}
-function onImageFileSelected(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const img = new Image();
-    img.onload = () => onImageObjectLoaded(img);
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
-}
+
+
+
+
 // ==========================================
 //  HERMITE SPLINE SYSTEM
 // ==========================================
+
+
+
+
+
+
+
+
+
+// Get visible control points for selected spline segment
+
+
+let currentCurvature = null;
+
+// ═══════════════════════════════════════════════
+//  OFFSET RENDERING HELPERS
+// ═══════════════════════════════════════════════
+function segNormal(a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+  return{nx:-dy/len,ny:dx/len};
+}
+
+
+
+
+
+function gColor(s){
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  return g?g.color:'#aaa';
+}
+
+
+
+
+
+
+// ═══════════════════════════════════════════════
+//  HIT TESTING
+// ═══════════════════════════════════════════════
+
+
+
+function hitHandle(pos,s,ptIdx,side){
+  if(!s||s.type!=='spline')return false;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+  const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
+  const h=side==='out'?outH:inH;
+  if(!h)return false;
+  // 픽셀 기준 반경: 줌 수준에 관계없이 항상 7px (점 10px보다 작아 점 우선순위 자연 보장)
+  const thresh = 7 / (MM * viewScale);
+  return Math.hypot(pLocal.x-h.x,pLocal.y-h.y)<thresh;
+}
+
+
+
+
+// Ensure cps array exists and has correct length for shape
+ function old_ensureCps(s){
+  const closed=isShapeClosed(s);
+  const rawPts=s.points;
+  const segs=closed?rawPts.length:rawPts.length-1;
+  if(!s.cps)s.cps=[];
+  while(s.cps.length<segs)s.cps.push([null,null]);
+}
+// Get/create segment control points, initializing from auto if null
+
+
+// ═══════════════════════════════════════════════
+//  MOUSE EVENTS
+// ═══════════════════════════════════════════════
+
+
+
+
+// ═══════════════════════════════════════════════
+//  CANVAS MODE HELPERS
+// ═══════════════════════════════════════════════
+
+
+
+  // ── Canvas mode ──
+
+
+
+  // ── Draw mode ──
+
+
+
+
+
+
+
+  // ── Arrange mode ──
+
+
+
+  // ── Label mode ──
+
+
+
+
+  // ── Keyboard ──
+document.addEventListener('keydown',e=>{
+  // input/textarea에서는 단축키 무시
+  if(e.target.matches('input,textarea,select'))return;
+
+  // Ctrl/Cmd 단축키
+  if(e.ctrlKey||e.metaKey){
+    if(e.key==='z'||e.key==='Z'){
+      e.preventDefault();
+      if(e.shiftKey)redo(); else undo();
+      return;
+    }
+    if(e.key==='y'||e.key==='Y'){e.preventDefault();redo();return;}
+    if(e.key==='s'||e.key==='S'){
+      e.preventDefault();
+      if(e.shiftKey){
+        saveProjectAs();
+      } else {
+        saveProject();
+      }
+      return;
+    }
+    if(e.key==='l'||e.key==='L'){e.preventDefault();loadProject();return;}
+    if(e.key==='p'||e.key==='P'){e.preventDefault();showExportModal();return;}
+    return;
+  }
+
+  if(e.key==='Escape'){
+    if(currentMode==='draw')setDrawTool('select');
+  }
+  if((e.key==='Delete'||e.key==='Backspace')){
+    if(currentMode==='draw')deleteSelectedShape();
+    else if(currentMode==='canvas'&&canvSelType==='image'&&canvSelId!==null){
+      images=images.filter(x=>x.id!==canvSelId);
+      canvSelId=null;canvSelType=null;
+      render();
+    }
+  }
+
+  // 그리기 모드 도구 단축키
+  if(currentMode==='draw'&&!e.altKey){
+    if(e.key==='l'||e.key==='L'){setDrawTool('line');return;}
+    if(e.key==='s'||e.key==='S'){setDrawTool('spline');return;}
+  }
+});
+// ═══════════════════════════════════════════════
+//  SAVE / LOAD / EXPORT
+// ═══════════════════════════════════════════════
+
+
+
+
+
+
+
+
+function svgPathD(s){
+  // Use bezier curves directly for spline, polyline for line
+  if(s.type==='spline'){
+    const closed=isShapeClosed(s);
+    const rawPts=s.points;
+    const rn=rawPts.length;if(rn<2)return null;
+    const hw=(s.strokeWidth||strokeWidth)/2;
+    // Sample polyline then build offset
+    const{pts}=getPolyline(s);
+    return svgOffsetPathD(pts,closed,hw);
+  }
+  const{pts,closed}=getPolyline(s);
+  if(pts.length<2)return null;
+  return svgOffsetPathD(pts,closed,(s.strokeWidth||strokeWidth)/2);
+}
+
+
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+
+window.addEventListener('resize',()=>{setCanvasSize();render();});
+requestAnimationFrame(()=>requestAnimationFrame(init));
+let currentSplineAlgo = "natural"; // natural, catmull, bspline
+
+function triggerAutosave() {
+  try {
+    const data = {
+      version: 4,
+      canvasW,
+      canvasH,
+      baseW,
+      baseH,
+      circle,
+      shapes,
+      groups,
+      nextGroupId,
+      labels,
+      strokeWidth,
+      bgColor: document.getElementById('cv-bg').value
+    };
+    localStorage.setItem('rotadraw_autosave', JSON.stringify(data));
+  } catch (e) {
+    console.warn('Auto-save failed:', e);
+  }
+}
+
+
+// --- math.js --- 
+function rotAround(pos,cx,cy,deg){
+  const r=deg*Math.PI/180,dx=pos.x-cx,dy=pos.y-cy;
+  return{x:cx+dx*Math.cos(r)-dy*Math.sin(r),y:cy+dx*Math.sin(r)+dy*Math.cos(r)};
+}
+
 function solveTridiagonal(A, B, C, D) {
   const n = D.length;
   const cPrime = new Float64Array(n);
@@ -484,131 +613,128 @@ function solveTridiagonal(A, B, C, D) {
 function solveNaturalCubicSpline(pts, closed) {
   const n = pts.length;
   if (n < 2) return;
-  
+
+  const h = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const nextIdx = (i + 1) % n;
+    h[i] = Math.max(Math.hypot(pts[nextIdx].x - pts[i].x, pts[nextIdx].y - pts[i].y), 1e-5);
+  }
+
+  // We will solve for V_i, the velocity at each point.
+  // outT_i = V_i * h_i / 3
+  // inT_i = -V_i * h_{i-1} / 3
+
   if (!closed) {
-    const A = new Float64Array(n);
-    const B = new Float64Array(n);
-    const C = new Float64Array(n);
-    const Dx = new Float64Array(n);
-    const Dy = new Float64Array(n);
-    
-    A[0] = 2; C[0] = 1; 
-    Dx[0] = 3 * (pts[1].x - pts[0].x);
-    Dy[0] = 3 * (pts[1].y - pts[0].y);
-    
-    for (let i = 1; i < n - 1; i++) {
-      B[i] = 1; A[i] = 4; C[i] = 1;
-      Dx[i] = 3 * (pts[i+1].x - pts[i-1].x);
-      Dy[i] = 3 * (pts[i+1].y - pts[i-1].y);
-    }
-    
-    B[n-1] = 1; A[n-1] = 2;
-    Dx[n-1] = 3 * (pts[n-1].x - pts[n-2].x);
-    Dy[n-1] = 3 * (pts[n-1].y - pts[n-2].y);
-    
-    const Tx = solveTridiagonal(A, B, C, Dx);
-    const Ty = solveTridiagonal(A, B, C, Dy);
-    
-    for (let i = 0; i < n; i++) {
-      if (!pts[i].manual) {
-        pts[i].outT = { x: Tx[i], y: Ty[i] };
-        pts[i].inT = { x: -Tx[i], y: -Ty[i] };
+    // Find blocks of non-manual points
+    let start = 0;
+    while (start < n) {
+      if (pts[start].manual) {
+        start++;
+        continue;
       }
+      let end = start;
+      while (end + 1 < n && !pts[end + 1].manual) {
+        end++;
+      }
+      
+      // We need to solve for V_{start} ... V_{end}
+      const cnt = end - start + 1;
+      const A = new Float64Array(cnt);
+      const B = new Float64Array(cnt);
+      const C = new Float64Array(cnt);
+      const Dx = new Float64Array(cnt);
+      const Dy = new Float64Array(cnt);
+
+      for (let j = 0; j < cnt; j++) {
+        const i = start + j;
+        if (i === 0) {
+          A[j] = 2; B[j] = 0; C[j] = 1;
+          Dx[j] = 3 * (pts[1].x - pts[0].x) / h[0];
+          Dy[j] = 3 * (pts[1].y - pts[0].y) / h[0];
+        } else if (i === n - 1) {
+          B[j] = 1; A[j] = 2; C[j] = 0;
+          Dx[j] = 3 * (pts[n-1].x - pts[n-2].x) / h[n-2];
+          Dy[j] = 3 * (pts[n-1].y - pts[n-2].y) / h[n-2];
+        } else {
+          B[j] = h[i]; A[j] = 2 * (h[i-1] + h[i]); C[j] = h[i-1];
+          const px = 3 * (h[i] * (pts[i].x - pts[i-1].x) / h[i-1] + h[i-1] * (pts[i+1].x - pts[i].x) / h[i]);
+          const py = 3 * (h[i] * (pts[i].y - pts[i-1].y) / h[i-1] + h[i-1] * (pts[i+1].y - pts[i].y) / h[i]);
+          Dx[j] = px; Dy[j] = py;
+        }
+
+        // Apply boundary conditions if neighbors are manual
+        if (i > 0 && i === start && pts[i-1].manual) {
+          const V_prev_x = 3 * pts[i-1].outT.x / h[i-1];
+          const V_prev_y = 3 * pts[i-1].outT.y / h[i-1];
+          Dx[j] -= B[j] * V_prev_x;
+          Dy[j] -= B[j] * V_prev_y;
+          B[j] = 0; // conceptually
+        }
+        if (i < n - 1 && i === end && pts[i+1].manual) {
+          const V_next_x = -3 * pts[i+1].inT.x / h[i];
+          const V_next_y = -3 * pts[i+1].inT.y / h[i];
+          Dx[j] -= C[j] * V_next_x;
+          Dy[j] -= C[j] * V_next_y;
+          C[j] = 0; // conceptually
+        }
+      }
+
+      const Vx = solveTridiagonal(A, B, C, Dx);
+      const Vy = solveTridiagonal(A, B, C, Dy);
+
+      for (let j = 0; j < cnt; j++) {
+        const i = start + j;
+        const vx = Vx[j], vy = Vy[j];
+        if (i < n - 1) pts[i].outT = { x: vx * h[i] / 3, y: vy * h[i] / 3 };
+        else pts[i].outT = { x: 0, y: 0 };
+        
+        if (i > 0) pts[i].inT = { x: -vx * h[i-1] / 3, y: -vy * h[i-1] / 3 };
+        else pts[i].inT = { x: 0, y: 0 };
+      }
+
+      start = end + 1;
     }
   } else {
-    // For closed spline, we use a simple iterative solver or Sherman-Morrison.
-    // Iterative Gauss-Seidel is very simple and fast for diagonally dominant systems (1, 4, 1).
-    const Tx = new Float64Array(n);
-    const Ty = new Float64Array(n);
-    for(let i=0; i<n; i++) {
-      // Initial guess (Catmull-Rom)
-      const prev = pts[(i - 1 + n) % n];
-      const next = pts[(i + 1) % n];
-      Tx[i] = (next.x - prev.x) / 2;
-      Ty[i] = (next.y - prev.y) / 2;
-    }
-    
-    for (let iter = 0; iter < 15; iter++) {
-      for (let i = 0; i < n; i++) {
-        if (pts[i].manual) continue;
+    // Closed spline handling (using iterative Gauss-Seidel for simplicity)
+    const Vx = new Float64Array(n);
+    const Vy = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      if (pts[i].manual) {
+        Vx[i] = 3 * pts[i].outT.x / h[i];
+        Vy[i] = 3 * pts[i].outT.y / h[i];
+      } else {
         const prev = pts[(i - 1 + n) % n];
         const next = pts[(i + 1) % n];
-        const prevT = Tx[(i - 1 + n) % n];
-        const nextT = Tx[(i + 1) % n];
-        
-        const rhsX = 3 * (next.x - prev.x) - prevT - nextT;
-        Tx[i] = rhsX / 4;
-        
-        const prevTy = Ty[(i - 1 + n) % n];
-        const nextTy = Ty[(i + 1) % n];
-        const rhsY = 3 * (next.y - prev.y) - prevTy - nextTy;
-        Ty[i] = rhsY / 4;
+        Vx[i] = (next.x - prev.x) / (h[(i-1+n)%n]/2 + h[i]/2);
+        Vy[i] = (next.y - prev.y) / (h[(i-1+n)%n]/2 + h[i]/2);
       }
     }
+
+    for (let iter = 0; iter < 20; iter++) {
+      for (let i = 0; i < n; i++) {
+        if (pts[i].manual) continue;
+        const iPrev = (i - 1 + n) % n;
+        const iNext = (i + 1) % n;
+        const hp = h[iPrev], hn = h[i];
+        const px = 3 * (hn * (pts[i].x - pts[iPrev].x) / hp + hp * (pts[iNext].x - pts[i].x) / hn);
+        const py = 3 * (hn * (pts[i].y - pts[iPrev].y) / hp + hp * (pts[iNext].y - pts[i].y) / hn);
+        
+        Vx[i] = (px - hn * Vx[iPrev] - hp * Vx[iNext]) / (2 * (hp + hn));
+        Vy[i] = (py - hn * Vy[iPrev] - hp * Vy[iNext]) / (2 * (hp + hn));
+      }
+    }
+
     for (let i = 0; i < n; i++) {
       if (!pts[i].manual) {
-        pts[i].outT = { x: Tx[i], y: Ty[i] };
-        pts[i].inT = { x: -Tx[i], y: -Ty[i] };
+        pts[i].outT = { x: Vx[i] * h[i] / 3, y: Vy[i] * h[i] / 3 };
+        pts[i].inT = { x: -Vx[i] * h[(i-1+n)%n] / 3, y: -Vy[i] * h[(i-1+n)%n] / 3 };
       }
     }
   }
 }
 
-function updateHermiteTangents(s) {
-  const pts = s.points;
-  const n = pts.length;
-  if (n < 2) return;
-  solveNaturalCubicSpline(pts, s.closed);
-}
-function getPolyline(s) {
-  const closed = s.closed === true;
-  if (s.type === 'line') return {pts: s.points.map(p=>({x:p.x, y:p.y})), closed};
-  const rawPts = s.points;
-  const rn = rawPts.length;
-  if (rn < 2) return {pts: rawPts.map(p=>({x:p.x, y:p.y})), closed};
-  const segs = closed ? rn : rn - 1;
-  const pts = [];
-  const steps = 20;
-  for (let i = 0; i < segs; i++) {
-    const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
-    const c0 = {x: p0.x + (p0.outT.x)/3, y: p0.y + (p0.outT.y)/3};
-    const c1 = {x: p1.x + (p1.inT.x)/3, y: p1.y + (p1.inT.y)/3};
-    for (let j = 0; j < steps; j++) {
-      const t = j / steps;
-      const u = 1 - t;
-      const x = u*u*u*p0.x + 3*u*u*t*c0.x + 3*u*t*t*c1.x + t*t*t*p1.x;
-      const y = u*u*u*p0.y + 3*u*u*t*c0.y + 3*u*t*t*c1.y + t*t*t*p1.y;
-      pts.push({x, y});
-    }
-  }
-  if (!closed) pts.push({x: rawPts[rn-1].x, y: rawPts[rn-1].y});
-  return {pts, closed};
-}
-function svgPathD(s) {
-  if (s.type === 'spline') {
-    const closed = s.closed === true;
-    const rawPts = s.points;
-    const rn = rawPts.length;
-    if (rn < 2) return null;
-    const segs = closed ? rn : rn - 1;
-    let d = `M ${rawPts[0].x.toFixed(2)} ${rawPts[0].y.toFixed(2)} `;
-    for (let i = 0; i < segs; i++) {
-      const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
-      const c0 = {x: p0.x + (p0.outT.x)/3, y: p0.y + (p0.outT.y)/3};
-      const c1 = {x: p1.x + (p1.inT.x)/3, y: p1.y + (p1.inT.y)/3};
-      d += `C ${c0.x.toFixed(2)} ${c0.y.toFixed(2)}, ${c1.x.toFixed(2)} ${c1.y.toFixed(2)}, ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} `;
-    }
-    if (closed) d += 'Z';
-    return d;
-  }
-  const closed = s.closed === true;
-  const rawPts = s.points;
-  if (rawPts.length < 2) return null;
-  let d = `M ${rawPts[0].x.toFixed(2)} ${rawPts[0].y.toFixed(2)} `;
-  rawPts.slice(1).forEach(p => d += `L ${p.x.toFixed(2)} ${p.y.toFixed(2)} `);
-  if (closed) d += 'Z';
-  return d;
-}
+
+
 function getCurvature(P0, M0, P1, M1, t) {
   let Vx, Vy, Ax, Ay;
   if (t === 0) {
@@ -634,10 +760,176 @@ function getCurvature(P0, M0, P1, M1, t) {
   const cy = (t===0?P0.y:P1.y) + (1/k) * ny;
   return { R, cx, cy };
 }
+
+function lineIntersectT(p1,d1,p2,d2){
+  const denom=d1.x*d2.y-d1.y*d2.x;
+  if(Math.abs(denom)<1e-10)return null;
+  const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/denom;
+  return t;
+}
+
+function solveCatmullRomSpline(pts, closed, alpha=0.5) {
+  const n = pts.length;
+  if (n < 2) return;
+  
+  const getP = (i) => {
+    if (closed) return pts[(i % n + n) % n];
+    if (i < 0) return { x: 2*pts[0].x - pts[1].x, y: 2*pts[0].y - pts[1].y };
+    if (i >= n) return { x: 2*pts[n-1].x - pts[n-2].x, y: 2*pts[n-1].y - pts[n-2].y };
+    return pts[i];
+  };
+  
+  const getD = (pA, pB) => Math.pow(Math.hypot(pB.x - pA.x, pB.y - pA.y), alpha) || 1e-5;
+  
+  for (let i = 0; i < n; i++) {
+    if (pts[i].manual) continue;
+    const p0 = getP(i - 1);
+    const p1 = getP(i);
+    const p2 = getP(i + 1);
+    
+    const d1 = getD(p0, p1);
+    const d2 = getD(p1, p2);
+    
+    const T1x = (d1 * (p2.x - p1.x)/d2 + d2 * (p1.x - p0.x)/d1) / (d1 + d2);
+    const T1y = (d1 * (p2.y - p1.y)/d2 + d2 * (p1.y - p0.y)/d1) / (d1 + d2);
+    
+    pts[i].outT = { x: T1x * d2 / 3, y: T1y * d2 / 3 };
+    pts[i].inT = { x: -T1x * d1 / 3, y: -T1y * d1 / 3 };
+  }
+}
+
+function solveGlobalBSpline(pts, closed) {
+  const n = pts.length;
+  if (n < 2) return;
+  
+  if (!closed) {
+    const C_x = new Float64Array(n);
+    const C_y = new Float64Array(n);
+    C_x[0] = pts[0].x; C_y[0] = pts[0].y;
+    C_x[n-1] = pts[n-1].x; C_y[n-1] = pts[n-1].y;
+    
+    if (n > 2) {
+      const A = new Float64Array(n-2);
+      const B = new Float64Array(n-2);
+      const C = new Float64Array(n-2);
+      const Dx = new Float64Array(n-2);
+      const Dy = new Float64Array(n-2);
+      
+      for(let i=0; i<n-2; i++) {
+        A[i] = 4; B[i] = 1; C[i] = 1;
+        Dx[i] = 6 * pts[i+1].x;
+        Dy[i] = 6 * pts[i+1].y;
+      }
+      Dx[0] -= pts[0].x;
+      Dy[0] -= pts[0].y;
+      Dx[n-3] -= pts[n-1].x;
+      Dy[n-3] -= pts[n-1].y;
+      
+      const Ix = solveTridiagonal(A, B, C, Dx);
+      const Iy = solveTridiagonal(A, B, C, Dy);
+      
+      for(let i=0; i<n-2; i++) {
+        C_x[i+1] = Ix[i];
+        C_y[i+1] = Iy[i];
+      }
+    }
+    
+    const getC = (i) => {
+      if (i === -1) return { x: 2*C_x[0] - C_x[1], y: 2*C_y[0] - C_y[1] };
+      if (i === n) return { x: 2*C_x[n-1] - C_x[n-2], y: 2*C_y[n-1] - C_y[n-2] };
+      return { x: C_x[i], y: C_y[i] };
+    };
+    
+    for(let i=0; i<n; i++) {
+      if (!pts[i].manual) {
+        const prev = getC(i-1), next = getC(i+1);
+        pts[i].outT = { x: (next.x - prev.x)/6, y: (next.y - prev.y)/6 };
+        pts[i].inT = { x: -(next.x - prev.x)/6, y: -(next.y - prev.y)/6 };
+      }
+    }
+  } else {
+    const C_x = new Float64Array(n);
+    const C_y = new Float64Array(n);
+    for(let i=0; i<n; i++) { C_x[i] = pts[i].x; C_y[i] = pts[i].y; }
+    
+    for(let iter=0; iter<15; iter++) {
+      for(let i=0; i<n; i++) {
+        const prevX = C_x[(i-1+n)%n], nextX = C_x[(i+1)%n];
+        C_x[i] = (6*pts[i].x - prevX - nextX)/4;
+        const prevY = C_y[(i-1+n)%n], nextY = C_y[(i+1)%n];
+        C_y[i] = (6*pts[i].y - prevY - nextY)/4;
+      }
+    }
+    
+    for(let i=0; i<n; i++) {
+      if (!pts[i].manual) {
+        const prevX = C_x[(i-1+n)%n], nextX = C_x[(i+1)%n];
+        const prevY = C_y[(i-1+n)%n], nextY = C_y[(i+1)%n];
+        pts[i].outT = { x: (nextX - prevX)/6, y: (nextY - prevY)/6 };
+        pts[i].inT = { x: -(nextX - prevX)/6, y: -(nextY - prevY)/6 };
+      }
+    }
+  }
+}
+
+
+// --- geometry.js --- 
+function getPolyline(s) {
+  const closed = s.closed === true;
+  if (s.type === 'line') return {pts: s.points.map(p=>({x:p.x, y:p.y})), closed};
+  const rawPts = s.points;
+  const rn = rawPts.length;
+  if (rn < 2) return {pts: rawPts.map(p=>({x:p.x, y:p.y})), closed};
+  const segs = closed ? rn : rn - 1;
+  const pts = [];
+  const steps = 20;
+  for (let i = 0; i < segs; i++) {
+    const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
+    const c0 = {x: p0.x + p0.outT.x, y: p0.y + p0.outT.y};
+    const c1 = {x: p1.x + p1.inT.x, y: p1.y + p1.inT.y};
+    for (let j = 0; j < steps; j++) {
+      const t = j / steps;
+      const u = 1 - t;
+      const x = u*u*u*p0.x + 3*u*u*t*c0.x + 3*u*t*t*c1.x + t*t*t*p1.x;
+      const y = u*u*u*p0.y + 3*u*u*t*c0.y + 3*u*t*t*c1.y + t*t*t*p1.y;
+      pts.push({x, y});
+    }
+  }
+  if (!closed) pts.push({x: rawPts[rn-1].x, y: rawPts[rn-1].y});
+  return {pts, closed};
+}
+
+function buildOffsetPath(pts, closed, hw, sc) {
+  const scaledPts = pts.map(p => ({ x: p.x * sc, y: p.y * sc }));
+  const scaledHw = hw * sc;
+  const d = svgOffsetPathD(scaledPts, closed, scaledHw);
+  if (!d) return null;
+  return new Path2D(d);
+}
+
+function getShapePath(s,sc){
+  const{pts,closed}=getPolyline(s);
+  if(pts.length<2)return null;
+  return buildOffsetPath(pts,closed,(s.strokeWidth||strokeWidth)/2,sc);
+}
+
+function segDist(p,a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+  if(l2===0)return Math.hypot(p.x-a.x,p.y-a.y);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+}
+
+function shapeCenter(s){
+  if(!s.points.length)return{x:0,y:0};
+  const xs=s.points.map(p=>p.x),ys=s.points.map(p=>p.y);
+  return{x:(Math.min(...xs)+Math.max(...xs))/2,y:(Math.min(...ys)+Math.max(...ys))/2};
+}
+
 function isShapeClosed(s){
   return s.closed === true;
 }
-// Get visible control points for selected spline segment
+
 function getHandlePositions(s, ptIdx) {
   if(!s||s.type!=='spline')return{out:null,inn:null};
   const p = s.points[ptIdx];
@@ -652,6 +944,89 @@ function getHandlePositions(s, ptIdx) {
   }
   return {out: outH, inn: inH};
 }
+
+function offsetSeg(a,b,halfW){
+  const{nx,ny}=segNormal(a,b);
+  return{
+    aL:{x:a.x+nx*halfW,y:a.y+ny*halfW},
+    bL:{x:b.x+nx*halfW,y:b.y+ny*halfW},
+    aR:{x:a.x-nx*halfW,y:a.y-ny*halfW},
+    bR:{x:b.x-nx*halfW,y:b.y-ny*halfW}
+  };
+}
+
+function miterJoin(bL_prev, dirPrev, bL_next, dirNext, halfW, maxMiter=4){
+  const d1={x:dirPrev.x,y:dirPrev.y};
+  const d2={x:dirNext.x,y:dirNext.y};
+  const t=lineIntersectT(bL_prev,d1,bL_next,d2);
+  if(t===null) return {x: (bL_prev.x + bL_next.x)/2, y: (bL_prev.y + bL_next.y)/2};
+  const ip={x:bL_prev.x+t*d1.x,y:bL_prev.y+t*d1.y};
+  const midX = (bL_prev.x + bL_next.x) / 2;
+  const midY = (bL_prev.y + bL_next.y) / 2;
+  const dx = ip.x - midX;
+  const dy = ip.y - midY;
+  const dist = Math.hypot(dx, dy);
+  if (dist > maxMiter * halfW) {
+    const scale = (maxMiter * halfW) / dist;
+    return {
+      x: midX + dx * scale,
+      y: midY + dy * scale
+    };
+  }
+  return ip;
+}
+
+function hitPoint(pos){
+  // 픽셀 기준 반경: 줌 수준에 관계없이 항상 10px
+  const thresh = 10 / (MM * viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+    // Draw 모드에서는 copy 선택 불가
+    if(currentMode==='draw' && s._isCopy) continue;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    for(let j=0;j<s.points.length;j++){
+      if(Math.hypot(pLocal.x-s.points[j].x,pLocal.y-s.points[j].y)<thresh)
+        return{shapeId:s.id,ptIdx:j};
+    }
+  }
+  return null;
+}
+
+function isPointInPolygon(p, s) {
+  const {pts} = getPolyline(s);
+  const n = pts.length;
+  if (n < 3) return false;
+  let inside = false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y;
+    const xj = pts[j].x, yj = pts[j].y;
+    const intersect = ((yi > p.y) !== (yj > p.y))
+        && (p.x < (xj - xi) * (p.y - yi) / (yj - yi + 1e-10) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function hitSegment(pos){
+  const thresh=Math.max(1.5,4/viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+    // Draw 모드에서는 copy 선택 불가
+    if(currentMode==='draw' && s._isCopy) continue;
+    if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    if (isShapeClosed(s)) {
+      if (isPointInPolygon(pLocal, s)) return s;
+    }
+    const{pts}=getPolyline(s);
+    for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
+    if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
+  }
+  return null;
+}
+
 function hitHandle(pos,s,ptIdx,side){
   if(!s||s.type!=='spline')return false;
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
@@ -659,10 +1034,398 @@ function hitHandle(pos,s,ptIdx,side){
   const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
   const h=side==='out'?outH:inH;
   if(!h)return false;
-  const dx=pLocal.x-h.x,dy=pLocal.y-h.y;
-  return dx*dx+dy*dy<25; // 5mm radius
+  // 픽셀 기준 반경 (점 10px보다 작아 점 우선순위 자연 보장)
+  const thresh = 7 / (MM * viewScale);
+  return Math.hypot(pLocal.x-h.x,pLocal.y-h.y)<thresh;
 }
-let currentCurvature = null;
+
+function hitGroupMarker(pos,g){
+  const rot=g.rotation*Math.PI/180;
+  const mx=circle.cx+Math.sin(rot)*circle.r;
+  const my=circle.cy-Math.cos(rot)*circle.r;
+  return Math.hypot(pos.x-mx,pos.y-my)<10;
+}
+
+function distToShape(pos,s){
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+  if (isShapeClosed(s) && isPointInPolygon(pLocal, s)) {
+    return 0;
+  }
+  const{pts}=getPolyline(s);
+  let md=Infinity;
+  for(let j=0;j<pts.length-1;j++)md=Math.min(md,segDist(pLocal,pts[j],pts[j+1]));
+  if(isShapeClosed(s)&&pts.length>2)md=Math.min(md,segDist(pLocal,pts[pts.length-1],pts[0]));
+  return Math.max(0,md-(s.strokeWidth||strokeWidth)/2);
+}
+
+function snapToPoint(pos,excludeId=null){
+  let best=null,bestD=SNAP_D;
+  shapes.forEach(s=>{
+    if(s.id===excludeId)return;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    s.points.forEach(p=>{
+      const pWorld = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
+      const d=Math.hypot(pos.x-pWorld.x,pos.y-pWorld.y);
+      if(d<bestD){bestD=d;best=pWorld;}
+    });
+  });
+  if(drawingShape&&drawingShape.points.length>=2){
+    const p0=drawingShape.points[0];const d=Math.hypot(pos.x-p0.x,pos.y-p0.y);if(d<bestD){bestD=d;best=p0;}
+  }
+  return best;
+}
+
+function ensureCps(s){return;}
+
+function getOrInitSeg(s,segIdx){
+  ensureCps(s);
+  if(!s.cps[segIdx]) s.cps[segIdx] = [null, null];
+  return s.cps[segIdx];
+}
+
+function splitBezier(p0, cp0, cp1, p1, t) {
+  const u = 1 - t;
+  const q0 = { x: u*p0.x + t*cp0.x, y: u*p0.y + t*cp0.y };
+  const q1 = { x: u*cp0.x + t*cp1.x, y: u*cp0.y + t*cp1.y };
+  const q2 = { x: u*cp1.x + t*p1.x, y: u*cp1.y + t*p1.y };
+  const r0 = { x: u*q0.x + t*q1.x, y: u*q0.y + t*q1.y };
+  const r1 = { x: u*q1.x + t*q2.x, y: u*q1.y + t*q2.y };
+  const pt = { x: u*r0.x + t*r1.x, y: u*r0.y + t*r1.y };
+  return { left: [p0, q0, r0, pt], right: [pt, r1, q2, p1] };
+}
+
+function getTransformHandles(obj) {
+  const {cx, cy, w, h, rotation} = obj;
+  const rad = rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const rot = (x, y) => ({ x: cx + x*cos - y*sin, y: cy + x*sin + y*cos });
+  return {
+    tl: rot(-w/2, -h/2), tr: rot(w/2, -h/2), br: rot(w/2, h/2), bl: rot(-w/2, h/2),
+    t: rot(0, -h/2), r: rot(w/2, 0), b: rot(0, h/2), l: rot(-w/2, 0),
+    rotH: rot(0, -h/2 - 10)
+  };
+}
+
+function hitTestCanvasObj(obj, pos) {
+  const rad = -obj.rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const dx = pos.x - obj.cx, dy = pos.y - obj.cy;
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  return Math.abs(lx) <= obj.w/2 && Math.abs(ly) <= obj.h/2;
+}
+
+function getShapesBounds() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  shapes.forEach(s => {
+    const g = s.groupId ? groups.find(x => x.id === s.groupId) : null;
+    const {pts} = getPolyline(s);
+    pts.forEach(p => {
+      const w = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
+      minX = Math.min(minX, w.x);
+      minY = Math.min(minY, w.y);
+      maxX = Math.max(maxX, w.x);
+      maxY = Math.max(maxY, w.y);
+    });
+  });
+  if (minX === Infinity) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function getCanvasModeTarget(pos) {
+  const hitR = Math.max(4, 8/viewScale);
+  // 1. Check active object handles
+  if (canvSelType === 'image') {
+    const activeObj = images.find(x => x.id === canvSelId);
+    if (activeObj) {
+      const handles = getTransformHandles(activeObj);
+      for (let k in handles) {
+        if (Math.hypot(pos.x - handles[k].x, pos.y - handles[k].y) < hitR) {
+          return { type: canvSelType, id: canvSelId, handle: k };
+        }
+      }
+    }
+  } else if (canvSelType === 'shapes' && shapesTransform) {
+    const handles = getTransformHandles(shapesTransform);
+    for (let k in handles) {
+      if (Math.hypot(pos.x - handles[k].x, pos.y - handles[k].y) < hitR) {
+        return { type: 'shapes', id: null, handle: k };
+      }
+    }
+  }
+  // 1.5. Check circle center or border
+  const distToCircleCenter = Math.hypot(pos.x - circle.cx, pos.y - circle.cy);
+  if (distToCircleCenter < Math.max(6, 12/viewScale) || Math.abs(distToCircleCenter - circle.r) < Math.max(3, 6/viewScale)) {
+    return { type: 'circle', id: null, handle: 'center' };
+  }
+  // 1.8. Check shapes (vector lines)
+  const hitShape = hitSegment(pos);
+  if (hitShape) {
+    const bounds = getShapesBounds();
+    if (bounds) {
+      shapesTransform.cx = bounds.x + bounds.w/2;
+      shapesTransform.cy = bounds.y + bounds.h/2;
+      shapesTransform.w = bounds.w;
+      shapesTransform.h = bounds.h;
+      shapesTransform.rotation = 0;
+      return { type: 'shapes', id: null, handle: 'center' };
+    }
+  }
+  // 2. Check images (front to back)
+  for (let i = images.length - 1; i >= 0; i--) {
+    if (hitTestCanvasObj(images[i], pos)) {
+      return { type: 'image', id: images[i].id, handle: 'center' };
+    }
+  }
+  return null;
+}
+
+function updateHermiteTangents(s) {
+  const pts = s.points;
+  const n = pts.length;
+  if (n < 2) return;
+  
+  if (typeof currentSplineAlgo !== 'undefined') {
+    if (currentSplineAlgo === 'natural') solveNaturalCubicSpline(pts, s.closed);
+    else if (currentSplineAlgo === 'catmull') solveCatmullRomSpline(pts, s.closed, 0.5);
+    else if (currentSplineAlgo === 'bspline') solveGlobalBSpline(pts, s.closed);
+    else solveNaturalCubicSpline(pts, s.closed);
+  } else {
+    solveNaturalCubicSpline(pts, s.closed);
+  }
+}
+
+// --- render.js --- 
+function render(){
+  const W=mainCanvas.width,H=mainCanvas.height,sc=MM*viewScale;
+  // 뷰포트 전체 클리어
+  bgCtx.clearRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H);
+  // pan/zoom 트랜스폼 적용 (캔버스는 뷰포트 고정 크기, 오프셋으로 이동)
+  bgCtx.save();
+  bgCtx.translate(viewOffX,viewOffY);
+  ctx.save();
+  ctx.translate(viewOffX,viewOffY);
+  // 용지 영역에만 배경색 채우기
+  bgCtx.fillStyle=document.getElementById('cv-bg').value;
+  bgCtx.fillRect(0,0,canvasW*sc,canvasH*sc);
+  if(bgImage)bgCtx.drawImage(bgImage,0,0,canvasW*sc,canvasH*sc);
+  renderCanvasMode(sc);
+  shapes.forEach(s=>renderShape(s,sc));
+  if(drawing&&drawingShape)renderShape(drawingShape,sc,true);
+  renderCircle(sc);
+  if(currentMode==='arrange'||currentMode==='label')renderGroupMarkers(sc);
+  if(currentMode==='label')renderLabels(sc);
+  if(currentMode==='draw'&&drawTool==='select'&&selShapeId!==null&&selPtIdx!==null)renderBezierHandles(sc);
+  if(typeof updateImageSizeUI === 'function') updateImageSizeUI();
+  // 트랜스폼 복구
+  bgCtx.restore();
+  ctx.restore();
+}
+
+function renderShape(s,sc,isPreview=false,customCtx=null){
+  const drawCtx=customCtx||ctx;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const color=gColor(s);
+  const isGhost=(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id));
+  const isCopyInDrawMode=(currentMode==='draw'&&s._isCopy);
+  // draw 모드에서 isGhost는 무시 (원본을 진하게 보이게)
+  const applyGhost = isGhost && currentMode !== 'draw';
+  const shapeOpacity = (s.opacity !== undefined ? s.opacity : 1.0);
+  drawCtx.save();
+  if(g&&g.rotation!==0){
+    drawCtx.translate(circle.cx*sc,circle.cy*sc);
+    drawCtx.rotate(g.rotation*Math.PI/180);
+    drawCtx.translate(-circle.cx*sc,-circle.cy*sc);
+  }
+  const baseAlpha = isPreview?0.55 : applyGhost?0.15 : isCopyInDrawMode?0.22 : 1.0;
+  drawCtx.globalAlpha = baseAlpha * shapeOpacity;
+  
+  const{pts,closed}=getPolyline(s);
+  if(pts.length>=2){
+    drawCtx.beginPath();
+    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    drawCtx.lineJoin = 'miter';
+    drawCtx.lineCap = 'round';
+    if(closed){
+      drawCtx.closePath();
+      drawCtx.fillStyle=color;
+      drawCtx.fill();
+      drawCtx.strokeStyle=color;
+      drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.stroke();
+    } else {
+      drawCtx.strokeStyle=color;
+      drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.stroke();
+    }
+  }
+
+  // Arrange highlight
+  if(currentMode==='arrange'&&s.id===arrSelShapeId&&pts.length>=2&&!customCtx){
+    drawCtx.save();
+    drawCtx.globalAlpha=0.3;
+    drawCtx.beginPath();
+    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    if(closed){
+      drawCtx.closePath();
+      drawCtx.fillStyle='#fff';
+      drawCtx.fill();
+    }
+    drawCtx.restore();
+    
+    drawCtx.globalAlpha=0.9;drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1.5;
+    drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    if(closed)drawCtx.closePath();
+    drawCtx.stroke();
+  }
+  // Draw mode vertex/edge drawing
+  if(currentMode==='draw'&&s.id===selShapeId&&!customCtx){
+    if(pts.length>=2){
+      drawCtx.strokeStyle='#4488ffaa';drawCtx.lineWidth=1;
+      drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+      if(closed)drawCtx.closePath();
+      drawCtx.stroke();
+    }
+    s.points.forEach((p,idx)=>{
+      const isSel=idx===selPtIdx;
+      drawCtx.beginPath();drawCtx.arc(p.x*sc,p.y*sc,isSel?6:4,0,Math.PI*2);
+      drawCtx.fillStyle=isSel?'#ff007f':'#4488ff';drawCtx.fill();
+      drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1;drawCtx.stroke();
+    });
+  }
+  drawCtx.restore();
+}
+
+function renderCircle(sc){
+  const cx=circle.cx*sc,cy=circle.cy*sc,r=circle.r*sc;
+  ctx.save();
+  ctx.strokeStyle='#4488ff77';ctx.lineWidth=1;ctx.setLineDash([5,5]);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#4488ffcc';ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();
+  if(currentMode==='canvas'){
+    ctx.strokeStyle='#4488ff44';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.stroke();
+    ctx.fillStyle='#4488ffbb';ctx.font='11px sans-serif';
+    ctx.fillText(`⌀${(circle.r*2).toFixed(1)}mm`,cx+r+5,cy+4);
+  }
+  ctx.restore();
+}
+
+function renderCanvasMode(sc) {
+  images.forEach(img => {
+     ctx.save();
+     ctx.globalAlpha = (img.opacity !== undefined ? img.opacity : 1.0);
+     ctx.translate(img.cx*sc, img.cy*sc);
+     ctx.rotate(img.rotation * Math.PI / 180);
+     ctx.drawImage(img.img, -img.w/2*sc, -img.h/2*sc, img.w*sc, img.h*sc);
+     ctx.restore();
+  });
+  if (paperGuide.visible) {
+    ctx.save();
+    ctx.translate(paperGuide.cx*sc, paperGuide.cy*sc);
+    ctx.rotate(paperGuide.rotation * Math.PI / 180);
+    ctx.strokeStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(-paperGuide.w/2*sc, -paperGuide.h/2*sc, paperGuide.w*sc, paperGuide.h*sc);
+    ctx.beginPath();
+    ctx.moveTo(-5, 0); ctx.lineTo(5, 0);
+    ctx.moveTo(0, -5); ctx.lineTo(0, 5);
+    ctx.stroke();
+    ctx.fillStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Paper', -paperGuide.w/2*sc + 2, -paperGuide.h/2*sc + 14);
+    ctx.restore();
+  }
+  if (currentMode === 'canvas') {
+     const activeObj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'image' ? images.find(x => x.id === canvSelId) : (canvSelType === 'shapes' ? shapesTransform : null));
+     if (activeObj) {
+        const rad = activeObj.rotation * Math.PI / 180;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        const rot = (x, y) => ({ x: (activeObj.cx + x*cos - y*sin)*sc, y: (activeObj.cy + x*sin + y*cos)*sc });
+        const w2 = activeObj.w/2, h2 = activeObj.h/2;
+        const handles = {
+          tl: rot(-w2, -h2), tr: rot(w2, -h2), br: rot(w2, h2), bl: rot(-w2, h2),
+          t: rot(0, -h2), r: rot(w2, 0), b: rot(0, h2), l: rot(-w2, 0),
+          rotH: rot(0, -h2 - 10)
+        };
+        ctx.strokeStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
+        ctx.fillStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        const r = 4;
+        ctx.beginPath();
+        ctx.moveTo(handles.tl.x, handles.tl.y);
+        ctx.lineTo(handles.tr.x, handles.tr.y);
+        ctx.lineTo(handles.br.x, handles.br.y);
+        ctx.lineTo(handles.bl.x, handles.bl.y);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(handles.t.x, handles.t.y);
+        ctx.lineTo(handles.rotH.x, handles.rotH.y);
+        ctx.stroke();
+        for(let k in handles) {
+           ctx.beginPath();
+           if(k === 'rotH') ctx.arc(handles[k].x, handles[k].y, r, 0, Math.PI*2);
+           else ctx.rect(handles[k].x - r, handles[k].y - r, r*2, r*2);
+           ctx.fill(); ctx.stroke();
+        }
+     }
+  }
+}
+
+function renderGroupMarkers(sc){
+  groups.forEach(g=>{
+    // Marker: radially tall (6mm tall, 1mm wide at circle edge)
+    const mRadHalf=3*sc;   // 6mm total radial height 편측3mm
+    const mTangHalf=0.5*sc; // 1mm tangential width 편측0.5mm
+    ctx.save();
+    ctx.translate(circle.cx*sc,circle.cy*sc);
+    ctx.rotate(g.rotation*Math.PI/180);
+    const edgeY=-(circle.r*sc);
+    const isSel=arrSelShapeId&&shapes.find(s=>s.id===arrSelShapeId)?.groupId===g.id;
+    ctx.fillStyle=g.color+(isSel?'ff':'bb');
+    ctx.strokeStyle=isSel?'#fff':g.color;
+    ctx.lineWidth=isSel?2:1;
+    ctx.beginPath();
+    ctx.rect(-mTangHalf,edgeY-mRadHalf,mTangHalf*2,mRadHalf*2);
+    ctx.fill();ctx.stroke();
+    // Label to the right
+    ctx.fillStyle='#fff';
+    ctx.font=`bold ${Math.max(9,3.5*sc)}px sans-serif`;
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillText(g.label,mTangHalf+4,edgeY);
+    ctx.restore();
+  });
+}
+
+function renderLabels(sc){
+  const fs=parseFloat(document.getElementById('label-size').value)||4;
+  shapes.forEach(s=>{
+    if(!s.groupId)return;
+    const g=groups.find(x=>x.id===s.groupId);if(!g)return;
+    const lbl=labels[s.id]||{ox:4,oy:-4};
+    const ctr=shapeCenter(s);
+    ctx.save();
+    ctx.translate(circle.cx*sc,circle.cy*sc);
+    ctx.rotate(g.rotation*Math.PI/180);
+    ctx.translate(-circle.cx*sc,-circle.cy*sc);
+    const lx=(ctr.x+lbl.ox)*sc,ly=(ctr.y+lbl.oy)*sc;
+    ctx.font=`bold ${fs*sc}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.strokeStyle='#000a';ctx.lineWidth=3;ctx.strokeText(g.label,lx,ly);
+    ctx.fillStyle=g.color;ctx.fillText(g.label,lx,ly);
+    ctx.restore();
+  });
+}
+
 function renderBezierHandles(sc){
   const s=shapes.find(x=>x.id===selShapeId);
   if(!s||s.type!=='spline'||selPtIdx===null)return;
@@ -704,561 +1467,8 @@ function renderBezierHandles(sc){
   }
   ctx.restore();
 }
-// ═══════════════════════════════════════════════
-//  OFFSET RENDERING HELPERS
-// ═══════════════════════════════════════════════
-function segNormal(a,b){
-  const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
-  return{nx:-dy/len,ny:dx/len};
-}
-function offsetSeg(a,b,halfW){
-  const{nx,ny}=segNormal(a,b);
-  return{
-    aL:{x:a.x+nx*halfW,y:a.y+ny*halfW},
-    bL:{x:b.x+nx*halfW,y:b.y+ny*halfW},
-    aR:{x:a.x-nx*halfW,y:a.y-ny*halfW},
-    bR:{x:b.x-nx*halfW,y:b.y-ny*halfW}
-  };
-}
-function lineIntersectT(p1,d1,p2,d2){
-  const denom=d1.x*d2.y-d1.y*d2.x;
-  if(Math.abs(denom)<1e-10)return null;
-  const t=((p2.x-p1.x)*d2.y-(p2.y-p1.y)*d2.x)/denom;
-  return t;
-}
-function miterJoin(bL_prev, dirPrev, bL_next, dirNext, halfW, maxMiter=4){
-  const d1={x:dirPrev.x,y:dirPrev.y};
-  const d2={x:dirNext.x,y:dirNext.y};
-  const t=lineIntersectT(bL_prev,d1,bL_next,d2);
-  if(t===null) return {x: (bL_prev.x + bL_next.x)/2, y: (bL_prev.y + bL_next.y)/2};
-  const ip={x:bL_prev.x+t*d1.x,y:bL_prev.y+t*d1.y};
-  const midX = (bL_prev.x + bL_next.x) / 2;
-  const midY = (bL_prev.y + bL_next.y) / 2;
-  const dx = ip.x - midX;
-  const dy = ip.y - midY;
-  const dist = Math.hypot(dx, dy);
-  if (dist > maxMiter * halfW) {
-    const scale = (maxMiter * halfW) / dist;
-    return {
-      x: midX + dx * scale,
-      y: midY + dy * scale
-    };
-  }
-  return ip;
-}
-function buildOffsetPath(pts, closed, hw, sc) {
-  const scaledPts = pts.map(p => ({ x: p.x * sc, y: p.y * sc }));
-  const scaledHw = hw * sc;
-  const d = svgOffsetPathD(scaledPts, closed, scaledHw);
-  if (!d) return null;
-  return new Path2D(d);
-}
-function getShapePath(s,sc){
-  const{pts,closed}=getPolyline(s);
-  if(pts.length<2)return null;
-  return buildOffsetPath(pts,closed,(s.strokeWidth||strokeWidth)/2,sc);
-}
-function gColor(s){
-  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  return g?g.color:'#aaa';
-}
-function renderShape(s,sc,isPreview=false,customCtx=null){
-  const drawCtx=customCtx||ctx;
-  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  const color=gColor(s);
-  const isGhost=(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id));
-  drawCtx.save();
-  if(g&&g.rotation!==0){
-    drawCtx.translate(circle.cx*sc,circle.cy*sc);
-    drawCtx.rotate(g.rotation*Math.PI/180);
-    drawCtx.translate(-circle.cx*sc,-circle.cy*sc);
-  }
-  drawCtx.globalAlpha=isPreview?0.55:isGhost?0.15:1;
-  const path=getShapePath(s,sc);
-  if(path){
-    drawCtx.fillStyle=color;
-    drawCtx.fill(path,'evenodd');
-  }
-  // Arrange highlight
-  if(currentMode==='arrange'&&s.id===arrSelShapeId&&path&&!customCtx){
-    drawCtx.globalAlpha=0.3;drawCtx.fillStyle='#fff';drawCtx.fill(path,'evenodd');
-    drawCtx.globalAlpha=0.9;drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1.5;
-    const{pts,closed}=getPolyline(s);
-    if(pts.length>=2){
-      drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-      if(closed)drawCtx.closePath();
-      drawCtx.stroke();
-    }
-  }
-  // Draw mode vertex/edge drawing
-  if(currentMode==='draw'&&s.id===selShapeId&&!customCtx){
-    const{pts,closed}=getPolyline(s);
-    if(pts.length>=2){
-      drawCtx.strokeStyle='#4488ffaa';drawCtx.lineWidth=1;
-      drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-      if(closed)drawCtx.closePath();
-      drawCtx.stroke();
-    }
-    s.points.forEach((p,idx)=>{
-      const isSel=idx===selPtIdx;
-      drawCtx.beginPath();drawCtx.arc(p.x*sc,p.y*sc,isSel?6:4,0,Math.PI*2);
-      drawCtx.fillStyle=isSel?'#ff007f':'#4488ff';drawCtx.fill();
-      drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1;drawCtx.stroke();
-    });
-  }
-  drawCtx.restore();
-}
-function renderCanvasMode(sc) {
-  images.forEach(img => {
-     ctx.save();
-     ctx.translate(img.cx*sc, img.cy*sc);
-     ctx.rotate(img.rotation * Math.PI / 180);
-     ctx.drawImage(img.img, -img.w/2*sc, -img.h/2*sc, img.w*sc, img.h*sc);
-     ctx.restore();
-  });
-  if (paperGuide.visible) {
-    ctx.save();
-    ctx.translate(paperGuide.cx*sc, paperGuide.cy*sc);
-    ctx.rotate(paperGuide.rotation * Math.PI / 180);
-    ctx.strokeStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([5, 5]);
-    ctx.strokeRect(-paperGuide.w/2*sc, -paperGuide.h/2*sc, paperGuide.w*sc, paperGuide.h*sc);
-    ctx.beginPath();
-    ctx.moveTo(-5, 0); ctx.lineTo(5, 0);
-    ctx.moveTo(0, -5); ctx.lineTo(0, 5);
-    ctx.stroke();
-    ctx.fillStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
-    ctx.font = '12px sans-serif';
-    ctx.fillText('Paper', -paperGuide.w/2*sc + 2, -paperGuide.h/2*sc + 14);
-    ctx.restore();
-  }
-  if (currentMode === 'canvas') {
-     const activeObj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'image' ? images.find(x => x.id === canvSelId) : null);
-     if (activeObj) {
-        const rad = activeObj.rotation * Math.PI / 180;
-        const cos = Math.cos(rad), sin = Math.sin(rad);
-        const rot = (x, y) => ({ x: (activeObj.cx + x*cos - y*sin)*sc, y: (activeObj.cy + x*sin + y*cos)*sc });
-        const w2 = activeObj.w/2, h2 = activeObj.h/2;
-        const handles = {
-          tl: rot(-w2, -h2), tr: rot(w2, -h2), br: rot(w2, h2), bl: rot(-w2, h2),
-          t: rot(0, -h2), r: rot(w2, 0), b: rot(0, h2), l: rot(-w2, 0),
-          rotH: rot(0, -h2 - 10)
-        };
-        ctx.strokeStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
-        ctx.fillStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([]);
-        const r = 4;
-        ctx.beginPath();
-        ctx.moveTo(handles.tl.x, handles.tl.y);
-        ctx.lineTo(handles.tr.x, handles.tr.y);
-        ctx.lineTo(handles.br.x, handles.br.y);
-        ctx.lineTo(handles.bl.x, handles.bl.y);
-        ctx.closePath();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(handles.t.x, handles.t.y);
-        ctx.lineTo(handles.rotH.x, handles.rotH.y);
-        ctx.stroke();
-        for(let k in handles) {
-           ctx.beginPath();
-           if(k === 'rotH') ctx.arc(handles[k].x, handles[k].y, r, 0, Math.PI*2);
-           else ctx.rect(handles[k].x - r, handles[k].y - r, r*2, r*2);
-           ctx.fill(); ctx.stroke();
-        }
-     }
-  }
-}
-function render(){
-  const W=mainCanvas.width,H=mainCanvas.height,sc=MM*viewScale;
-  bgCtx.clearRect(0,0,W,H);
-  bgCtx.fillStyle=document.getElementById('cv-bg').value;
-  bgCtx.fillRect(0,0,W,H);
-  if(bgImage)bgCtx.drawImage(bgImage,0,0,W,H);
-  ctx.clearRect(0,0,W,H);
-  renderCanvasMode(sc);
-  shapes.forEach(s=>renderShape(s,sc));
-  if(drawing&&drawingShape)renderShape(drawingShape,sc,true);
-  renderCircle(sc);
-  if(currentMode==='arrange'||currentMode==='label')renderGroupMarkers(sc);
-  if(currentMode==='label')renderLabels(sc);
-  if(currentMode==='draw'&&drawTool==='select'&&selShapeId!==null&&selPtIdx!==null)renderBezierHandles(sc);
-}
-function renderCircle(sc){
-  const cx=circle.cx*sc,cy=circle.cy*sc,r=circle.r*sc;
-  ctx.save();
-  ctx.strokeStyle='#4488ff77';ctx.lineWidth=1;ctx.setLineDash([5,5]);
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='#4488ffcc';ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();
-  if(currentMode==='canvas'){
-    ctx.strokeStyle='#4488ff44';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.stroke();
-    ctx.fillStyle='#4488ffbb';ctx.font='11px sans-serif';
-    ctx.fillText(`⌀${(circle.r*2).toFixed(1)}mm`,cx+r+5,cy+4);
-  }
-  ctx.restore();
-}
-function renderGroupMarkers(sc){
-  groups.forEach(g=>{
-    // Marker: radially tall (6mm tall, 1mm wide at circle edge)
-    const mRadHalf=3*sc;   // 6mm total radial height 편측3mm
-    const mTangHalf=0.5*sc; // 1mm tangential width 편측0.5mm
-    ctx.save();
-    ctx.translate(circle.cx*sc,circle.cy*sc);
-    ctx.rotate(g.rotation*Math.PI/180);
-    const edgeY=-(circle.r*sc);
-    const isSel=arrSelShapeId&&shapes.find(s=>s.id===arrSelShapeId)?.groupId===g.id;
-    ctx.fillStyle=g.color+(isSel?'ff':'bb');
-    ctx.strokeStyle=isSel?'#fff':g.color;
-    ctx.lineWidth=isSel?2:1;
-    ctx.beginPath();
-    ctx.rect(-mTangHalf,edgeY-mRadHalf,mTangHalf*2,mRadHalf*2);
-    ctx.fill();ctx.stroke();
-    // Label to the right
-    ctx.fillStyle='#fff';
-    ctx.font=`bold ${Math.max(9,3.5*sc)}px sans-serif`;
-    ctx.textAlign='left';ctx.textBaseline='middle';
-    ctx.fillText(g.label,mTangHalf+4,edgeY);
-    ctx.restore();
-  });
-}
-function renderLabels(sc){
-  const fs=parseFloat(document.getElementById('label-size').value)||4;
-  shapes.forEach(s=>{
-    if(!s.groupId)return;
-    const g=groups.find(x=>x.id===s.groupId);if(!g)return;
-    const lbl=labels[s.id]||{ox:4,oy:-4};
-    const ctr=shapeCenter(s);
-    ctx.save();
-    ctx.translate(circle.cx*sc,circle.cy*sc);
-    ctx.rotate(g.rotation*Math.PI/180);
-    ctx.translate(-circle.cx*sc,-circle.cy*sc);
-    const lx=(ctr.x+lbl.ox)*sc,ly=(ctr.y+lbl.oy)*sc;
-    ctx.font=`bold ${fs*sc}px sans-serif`;
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.strokeStyle='#000a';ctx.lineWidth=3;ctx.strokeText(g.label,lx,ly);
-    ctx.fillStyle=g.color;ctx.fillText(g.label,lx,ly);
-    ctx.restore();
-  });
-}
-// ═══════════════════════════════════════════════
-//  HIT TESTING
-// ═══════════════════════════════════════════════
-function hitPoint(pos){
-  const thresh=Math.max(2.5,6/viewScale);
-  for(let i=shapes.length-1;i>=0;i--){
-    const s=shapes[i];
-  // ── Draw mode ──
-    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
-    for(let j=0;j<s.points.length;j++){
-      if(Math.hypot(pLocal.x-s.points[j].x,pLocal.y-s.points[j].y)<thresh)
-        return{shapeId:s.id,ptIdx:j};
-    }
-  }
-  return null;
-}
-function hitSegment(pos){
-  const thresh=Math.max(1.5,4/viewScale);
-  for(let i=shapes.length-1;i>=0;i--){
-    const s=shapes[i];
-  // ── Draw mode ──
-    if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
-    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
-    const{pts}=getPolyline(s);
-    for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
-    if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
-  }
-  return null;
-}
-function segDist(p,a,b){
-  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
-  if(l2===0)return Math.hypot(p.x-a.x,p.y-a.y);
-  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
-  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
-}
-function hitHandle(pos,s,ptIdx,side){
-  if(!s||s.type!=='spline')return false;
-  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
-  const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
-  const h=side==='out'?outH:inH;
-  if(!h)return false;
-  return Math.hypot(pLocal.x-h.x,pLocal.y-h.y)<Math.max(2,6/viewScale);
-}
-function hitGroupMarker(pos,g){
-  const rot=g.rotation*Math.PI/180;
-  const mx=circle.cx+Math.sin(rot)*circle.r;
-  const my=circle.cy-Math.cos(rot)*circle.r;
-  return Math.hypot(pos.x-mx,pos.y-my)<10;
-}
-function shapeCenter(s){
-  if(!s.points.length)return{x:0,y:0};
-  const xs=s.points.map(p=>p.x),ys=s.points.map(p=>p.y);
-  return{x:(Math.min(...xs)+Math.max(...xs))/2,y:(Math.min(...ys)+Math.max(...ys))/2};
-}
-function distToShape(pos,s){
-  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
-  const{pts}=getPolyline(s);
-  let md=Infinity;
-  for(let j=0;j<pts.length-1;j++)md=Math.min(md,segDist(pLocal,pts[j],pts[j+1]));
-  if(isShapeClosed(s)&&pts.length>2)md=Math.min(md,segDist(pLocal,pts[pts.length-1],pts[0]));
-  return Math.max(0,md-(s.strokeWidth||strokeWidth)/2);
-}
-function snapToPoint(pos,excludeId=null){
-  let best=null,bestD=SNAP_D;
-  shapes.forEach(s=>{
-    if(s.id===excludeId)return;
-    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-    s.points.forEach(p=>{
-      const pWorld = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
-      const d=Math.hypot(pos.x-pWorld.x,pos.y-pWorld.y);
-      if(d<bestD){bestD=d;best=pWorld;}
-    });
-  });
-  if(drawingShape&&drawingShape.points.length>=2){
-    const p0=drawingShape.points[0];const d=Math.hypot(pos.x-p0.x,pos.y-p0.y);if(d<bestD){bestD=d;best=p0;}
-  }
-  return best;
-}
-// Ensure cps array exists and has correct length for shape
-function ensureCps(s){return;} function old_ensureCps(s){
-  const closed=isShapeClosed(s);
-  const rawPts=s.points;
-  const segs=closed?rawPts.length:rawPts.length-1;
-  if(!s.cps)s.cps=[];
-  while(s.cps.length<segs)s.cps.push([null,null]);
-}
-// Get/create segment control points, initializing from auto if null
-function getOrInitSeg(s,segIdx){
-  ensureCps(s);
-  if(!s.cps[segIdx]) s.cps[segIdx] = [null, null];
-  return s.cps[segIdx];
-}
-function splitBezier(p0, cp0, cp1, p1, t) {
-  const u = 1 - t;
-  const q0 = { x: u*p0.x + t*cp0.x, y: u*p0.y + t*cp0.y };
-  const q1 = { x: u*cp0.x + t*cp1.x, y: u*cp0.y + t*cp1.y };
-  const q2 = { x: u*cp1.x + t*p1.x, y: u*cp1.y + t*p1.y };
-  const r0 = { x: u*q0.x + t*q1.x, y: u*q0.y + t*q1.y };
-  const r1 = { x: u*q1.x + t*q2.x, y: u*q1.y + t*q2.y };
-  const pt = { x: u*r0.x + t*r1.x, y: u*r0.y + t*r1.y };
-  return { left: [p0, q0, r0, pt], right: [pt, r1, q2, p1] };
-}
-// ═══════════════════════════════════════════════
-//  MOUSE EVENTS
-// ═══════════════════════════════════════════════
-mainCanvas.addEventListener('mousedown',e=>{if(e.button!==0)return;const p=clientToMm(e);_mdMm=p;_hasDragged=false;
-  if(currentMode==='canvas')mCanvasDown(p,e);
-  else if(currentMode==='draw')mDrawDown(p,e);
-  else if(currentMode==='arrange')mArrDown(p,e);
-  else if(currentMode==='label')mLblDown(p,e);
-});
-mainCanvas.addEventListener('mousemove',e=>{
-  const p=clientToMm(e);
-  if(_mdMm&&Math.hypot(p.x-_mdMm.x,p.y-_mdMm.y)>0.6)_hasDragged=true;
-  document.getElementById('sb-pos').textContent=`x: ${p.x.toFixed(1)}  y: ${p.y.toFixed(1)} mm`;
-  if(currentMode==='canvas')mCanvasMove(p,e);
-  else if(currentMode==='draw')mDrawMove(p,e);
-  else if(currentMode==='arrange')mArrMove(p,e);
-  else if(currentMode==='label')mLblMove(p,e);
-});
-window.addEventListener('mouseup',e=>{
-  if(e.button!==0)return;
-  if(_mdMm){
-    const p=clientToMm(e);
-    if(currentMode==='canvas')mCanvasUp(p);
-    else if(currentMode==='draw')mDrawUp(p,e);
-    else if(currentMode==='arrange')mArrUp(p,e);
-    else if(currentMode==='label')mLblUp(p);
-  }
-  _mdMm=null;
-  _hasDragged=false;
-});
-mainCanvas.addEventListener('dblclick',e=>{if(currentMode==='draw'&&drawTool!=='select')finishDrawing();});
-function showContextMenu(e, items){
-  const cm = document.getElementById('context-menu');
-  cm.innerHTML = '';
-  items.forEach(item => {
-    const btn = document.createElement('div');
-    btn.textContent = item.label;
-    btn.style.padding = '6px 12px';
-    btn.style.fontSize = '12px';
-    btn.style.color = '#eee';
-    btn.style.cursor = 'pointer';
-    btn.onmouseenter = () => btn.style.background = '#1a5a9a';
-    btn.onmouseleave = () => btn.style.background = 'transparent';
-    btn.onclick = (ev) => {
-      ev.stopPropagation();
-      item.action();
-      cm.style.display = 'none';
-    };
-    cm.appendChild(btn);
-  });
-  cm.style.left = e.clientX + 'px';
-  cm.style.top = e.clientY + 'px';
-  cm.style.display = 'block';
-}
-window.addEventListener('click', () => {
-  const cm = document.getElementById('context-menu');
-  if(cm) cm.style.display = 'none';
-});
-mainCanvas.addEventListener('contextmenu',e=>{
-  e.preventDefault();
-  if(drawing){finishDrawing();return;}
-  if(currentMode==='draw' && drawTool==='select'){
-    const p = clientToMm(e);
-    const hp = hitPoint(p);
-    if(hp) {
-       const s = shapes.find(x => x.id === hp.shapeId);
-         if(s && s.type === 'spline') {
-            const p = s.points[hp.ptIdx];
-            const isFree = p.mode === 'free';
-            showContextMenu(e, [
-              {
-                label: isFree ? '대칭 모드로 변환' : '자유 모드로 변환',
-                action: () => {
-                  p.mode = isFree ? 'sym' : 'free';
-                  if(p.mode === 'sym') p.inT = {x: -p.outT.x, y: -p.outT.y};
-                  render();
-                }
-              },
-              {
-                label: '자동 핸들로 재설정',
-                action: () => {
-                  p.manual = false;
-                  updateHermiteTangents(s);
-                  render();
-                }
-              },
-              {
-                label: '점 삭제',
-                action: () => {
-                  s.points.splice(hp.ptIdx, 1);
-                  if(s.points.length<2) {
-                    shapes=shapes.filter(x=>x.id!==s.id);
-                  } else {
-                    updateHermiteTangents(s);
-                  }
-                  selPtIdx=null; render();
-                }
-              }
-            ]);
-            return;
-          }
-    }
-    const hs = hitSegment(p);
-    if(hs && hs.type === 'spline'){
-       showContextMenu(e, [
-         {
-           label: '점 추가',
-           action: () => {
-             const closed = isShapeClosed(hs);
-             const n = hs.points.length;
-             const segs = closed ? n : n - 1;
-             const g = hs.groupId ? groups.find(x=>x.id===hs.groupId) : null;
-             const pLocal = g ? rotAround(p, circle.cx, circle.cy, -g.rotation) : p;
-             let bestSeg = null; let minD = Infinity; let bestT = 0;
-             for(let i=0; i<segs; i++) {
-               const p0 = hs.points[i];
-               const p1 = hs.points[(i+1)%n];
-               const cp0 = { x: p0.x + p0.outT.x / 3, y: p0.y + p0.outT.y / 3 };
-               const cp1 = { x: p1.x + p1.inT.x / 3, y: p1.y + p1.inT.y / 3 };
-               for(let t=0; t<=1; t+=0.02) {
-                 const u=1-t, x=u*u*u*p0.x+3*u*u*t*cp0.x+3*u*t*t*cp1.x+t*t*t*p1.x;
-                 const y=u*u*u*p0.y+3*u*u*t*cp0.y+3*u*t*t*cp1.y+t*t*t*p1.y;
-                 const d = Math.hypot(pLocal.x-x, pLocal.y-y);
-                 if(d < minD){ minD = d; bestSeg = i; bestT = t; }
-               }
-             }
-             if(bestSeg !== null) {
-               const i = bestSeg;
-               const p0 = hs.points[i], p1 = hs.points[(i+1)%n];
-               const cp0 = { x: p0.x + p0.outT.x / 3, y: p0.y + p0.outT.y / 3 };
-               const cp1 = { x: p1.x + p1.inT.x / 3, y: p1.y + p1.inT.y / 3 };
-               const u = 1 - bestT;
-               const nx = u*u*u*p0.x + 3*u*u*bestT*cp0.x + 3*u*bestT*bestT*cp1.x + bestT*bestT*bestT*p1.x;
-               const ny = u*u*u*p0.y + 3*u*u*bestT*cp0.y + 3*u*bestT*bestT*cp1.y + bestT*bestT*bestT*p1.y;
-               const split = splitBezier(p0, cp0, cp1, p1, bestT);
-                const pt = split.left[3];
-                const newPt = {
-                  x: nx,
-                  y: ny,
-                  inT: { x: 0, y: 0 },
-                  outT: { x: 0, y: 0 },
-                  mode: 'free',
-                  manual: false
-                };
-                
-                // Allow the global solver to recalculate the shape
-                p0.manual = false;
-                p1.manual = false;
-                
-                hs.points.splice(i+1, 0, newPt);
-                render();
-              }
-           }
-         }
-       ]);
-       return;
-    }
-  }
-});
-// ═══════════════════════════════════════════════
-//  CANVAS MODE HELPERS
-// ═══════════════════════════════════════════════
-function getTransformHandles(obj) {
-  const {cx, cy, w, h, rotation} = obj;
-  const rad = rotation * Math.PI / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  const rot = (x, y) => ({ x: cx + x*cos - y*sin, y: cy + x*sin + y*cos });
-  return {
-    tl: rot(-w/2, -h/2), tr: rot(w/2, -h/2), br: rot(w/2, h/2), bl: rot(-w/2, h/2),
-    t: rot(0, -h/2), r: rot(w/2, 0), b: rot(0, h/2), l: rot(-w/2, 0),
-    rotH: rot(0, -h/2 - 10)
-  };
-}
-function hitTestCanvasObj(obj, pos) {
-  const rad = -obj.rotation * Math.PI / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  const dx = pos.x - obj.cx, dy = pos.y - obj.cy;
-  const lx = dx * cos - dy * sin;
-  const ly = dx * sin + dy * cos;
-  return Math.abs(lx) <= obj.w/2 && Math.abs(ly) <= obj.h/2;
-}
-function getCanvasModeTarget(pos) {
-  const hitR = Math.max(4, 8/viewScale);
-  // 1. Check active object handles (only images, paper guide is locked)
-  if (canvSelType === 'image') {
-    const activeObj = images.find(x => x.id === canvSelId);
-    if (activeObj) {
-      const handles = getTransformHandles(activeObj);
-      for (let k in handles) {
-        if (Math.hypot(pos.x - handles[k].x, pos.y - handles[k].y) < hitR) {
-          return { type: canvSelType, id: canvSelId, handle: k };
-        }
-      }
-    }
-  }
-  // 1.5. Check circle center or border
-  const distToCircleCenter = Math.hypot(pos.x - circle.cx, pos.y - circle.cy);
-  if (distToCircleCenter < Math.max(6, 12/viewScale) || Math.abs(distToCircleCenter - circle.r) < Math.max(3, 6/viewScale)) {
-    return { type: 'circle', id: null, handle: 'center' };
-  }
-  // 2. Check images (front to back)
-  for (let i = images.length - 1; i >= 0; i--) {
-    if (hitTestCanvasObj(images[i], pos)) {
-      return { type: 'image', id: images[i].id, handle: 'center' };
-    }
-  }
-  return null;
-}
-  // ── Canvas mode ──
+
+// --- tools.js --- 
 function mCanvasDown(pos,e){
   const target = getCanvasModeTarget(pos);
   if (target) {
@@ -1266,9 +1476,12 @@ function mCanvasDown(pos,e){
     canvSelId = target.id;
     canvSelHandle = target.handle;
     canvDragStartPos = { x: pos.x, y: pos.y };
-    const obj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'circle' ? circle : images.find(x => x.id === canvSelId));
+    const obj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'circle' ? circle : (canvSelType === 'shapes' ? shapesTransform : images.find(x => x.id === canvSelId)));
     if(obj) {
       canvDragStartObj = { cx: obj.cx, cy: obj.cy, w: obj.w, h: obj.h, rotation: obj.rotation };
+    }
+    if (canvSelType === 'shapes') {
+      transformStartShapes = JSON.parse(JSON.stringify(shapes));
     }
   } else {
     canvSelType = null;
@@ -1277,9 +1490,10 @@ function mCanvasDown(pos,e){
   }
   render();
 }
+
 function mCanvasMove(pos,e){
   if (!canvSelHandle || !_mdMm) return;
-  const obj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'circle' ? circle : images.find(x => x.id === canvSelId));
+  const obj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'circle' ? circle : (canvSelType === 'shapes' ? shapesTransform : images.find(x => x.id === canvSelId)));
   if (!obj) return;
   const dx = pos.x - canvDragStartPos.x;
   const dy = pos.y - canvDragStartPos.y;
@@ -1315,31 +1529,112 @@ function mCanvasMove(pos,e){
       document.getElementById('cv-h').value = Math.round(obj.h);
     }
   }
+
+  // shapes 실시간 변환 적용
+  if (canvSelType === 'shapes' && transformStartShapes) {
+    const startObj = canvDragStartObj;
+    const currentObj = shapesTransform;
+    const sx = startObj.w > 0 ? (currentObj.w / startObj.w) : 1;
+    const sy = startObj.h > 0 ? (currentObj.h / startObj.h) : 1;
+    const dRot = currentObj.rotation - startObj.rotation;
+    const dxVal = currentObj.cx - startObj.cx;
+    const dyVal = currentObj.cy - startObj.cy;
+
+    shapes = JSON.parse(JSON.stringify(transformStartShapes));
+    shapes.forEach(shape => {
+      shape.points.forEach(p => {
+        let px1 = startObj.cx + (p.x - startObj.cx) * sx;
+        let py1 = startObj.cy + (p.y - startObj.cy) * sy;
+        let pRot = rotAround({ x: px1, y: py1 }, startObj.cx, startObj.cy, dRot);
+        p.x = pRot.x + dxVal;
+        p.y = pRot.y + dyVal;
+
+        if (p.inT) {
+          let vx1 = p.inT.x * sx;
+          let vy1 = p.inT.y * sy;
+          let vRot = rotAround({ x: vx1, y: vy1 }, 0, 0, dRot);
+          p.inT.x = vRot.x;
+          p.inT.y = vRot.y;
+        }
+        if (p.outT) {
+          let vx1 = p.outT.x * sx;
+          let vy1 = p.outT.y * sy;
+          let vRot = rotAround({ x: vx1, y: vy1 }, 0, 0, dRot);
+          p.outT.x = vRot.x;
+          p.outT.y = vRot.y;
+        }
+      });
+    });
+  }
+
   render();
 }
-function mCanvasUp(pos){ canvSelHandle = null; }
-  // ── Draw mode ──
+
+function mCanvasUp(pos){
+  canvSelHandle = null;
+  if (canvSelType === 'shapes') {
+    if (transformStartShapes) {
+      saveSnapshot();
+      triggerAutosave();
+      transformStartShapes = null;
+    }
+    const bounds = getShapesBounds();
+    if (bounds) {
+      shapesTransform.cx = bounds.x + bounds.w/2;
+      shapesTransform.cy = bounds.y + bounds.h/2;
+      shapesTransform.w = bounds.w;
+      shapesTransform.h = bounds.h;
+      shapesTransform.rotation = 0;
+    }
+  }
+}
+
 function mDrawDown(pos,e){
   if(drawTool==='select'){
     const s=selShapeId!==null?shapes.find(x=>x.id===selShapeId):null;
-    // 1. Check bezier handles if point is selected
-    if(s&&s.type==='spline'&&selPtIdx!==null){
+
+    // 1. 먼저 클릭 위치에 포인트가 있는지 확인
+    const hp=hitPoint(pos);
+
+    // 2. 클릭된 점이 현재 선택된 바로 그 점일 때만 핸들을 우선 체크
+    //    (이미 선택된 점 위에서 핸들을 드래그해야 하므로)
+    if(hp && s && s.type==='spline' && selPtIdx!==null
+       && hp.shapeId===selShapeId && hp.ptIdx===selPtIdx){
+      const pd=s.points[selPtIdx];
       if(hitHandle(pos,s,selPtIdx,'out')){
-        dragState={type:'cpOut',shapeId:s.id,ptIdx:selPtIdx};
+        const outH={x:pd.x+pd.outT.x,y:pd.y+pd.outT.y};
+        dragState={type:'cpOut',shapeId:s.id,ptIdx:selPtIdx,grabX:outH.x-pos.x,grabY:outH.y-pos.y};
         return;
       }
       if(hitHandle(pos,s,selPtIdx,'in')){
-        dragState={type:'cpIn',shapeId:s.id,ptIdx:selPtIdx};
+        const inH={x:pd.x+pd.inT.x,y:pd.y+pd.inT.y};
+        dragState={type:'cpIn',shapeId:s.id,ptIdx:selPtIdx,grabX:inH.x-pos.x,grabY:inH.y-pos.y};
         return;
       }
     }
-      // 2. Hit test control point
-    const hp=hitPoint(pos);
+
+    // 3. 포인트 클릭 처리 (어떤 핸들보다 우선)
     if(hp){
       selShapeId=hp.shapeId;selPtIdx=hp.ptIdx;selHandle=null;dragState=null;
       updatePropsPanel();render();return;
     }
-    // 3. Hit test shape
+
+    // 4. 포인트가 없을 때만 핸들 체크 (선택된 점의 핸들 드래그 시작)
+    if(s&&s.type==='spline'&&selPtIdx!==null){
+      const pd=s.points[selPtIdx];
+      if(hitHandle(pos,s,selPtIdx,'out')){
+        const outH={x:pd.x+pd.outT.x,y:pd.y+pd.outT.y};
+        dragState={type:'cpOut',shapeId:s.id,ptIdx:selPtIdx,grabX:outH.x-pos.x,grabY:outH.y-pos.y};
+        return;
+      }
+      if(hitHandle(pos,s,selPtIdx,'in')){
+        const inH={x:pd.x+pd.inT.x,y:pd.y+pd.inT.y};
+        dragState={type:'cpIn',shapeId:s.id,ptIdx:selPtIdx,grabX:inH.x-pos.x,grabY:inH.y-pos.y};
+        return;
+      }
+    }
+
+    // 5. 도형(선분) 클릭
     const hs=hitSegment(pos);
     if(hs){
       selShapeId=hs.id;selPtIdx=null;selHandle=null;
@@ -1354,18 +1649,20 @@ function mDrawDown(pos,e){
   let sx=pos.x,sy=pos.y;
   if(!snapOff){const sn=snapToPoint(pos,drawing?drawingShape?.id:null);if(sn){sx=sn.x;sy=sn.y;}}
   if(!drawing){
-    drawingShape={id:nextShapeId++,type:drawTool,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'sym'}],closed:false,strokeWidth,groupId:GROUP1_ID};
+    drawingShape={id:nextShapeId++,type:drawTool,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'}],closed:false,strokeWidth,groupId:GROUP1_ID};
     drawing=true;
   } else {
     const p0=drawingShape.points[0];
     if(drawingShape.points.length>=2&&Math.hypot(sx-p0.x,sy-p0.y)<SNAP_D){
       drawingShape.closed=true;finishDrawing();return;
     }
-    drawingShape.points.push({x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'sym'});
+    drawingShape.points.push({x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'});
       if (drawingShape.type==='spline') updateHermiteTangents(drawingShape);
+      // 그리기 중에는 원본 복사본 동기화 불필요 (혁재 그리는 도형은 아직 shapes에 없음)
   }
   render();
 }
+
 function mDrawMove(pos,e){
   const snapOff=e.ctrlKey;
   if(drawTool==='select'&&!dragState){
@@ -1376,9 +1673,17 @@ function mDrawMove(pos,e){
   if(dragState?.type==='cpOut'){
     const s=shapes.find(x=>x.id===dragState.shapeId);if(s){
       const p = s.points[dragState.ptIdx];
-      p.manual = true; // Mark as manually adjusted
-      p.outT = {x: pos.x - p.x, y: pos.y - p.y};
+      p.manual = true;
+      // grab 오프셋 적용: 클릭 지점에서 핸들 중심까지의 차이를 보정
+      const tx = pos.x + (dragState.grabX||0);
+      const ty = pos.y + (dragState.grabY||0);
+      p.outT = {x: tx - p.x, y: ty - p.y};
       if (p.mode === 'sym') p.inT = {x: -p.outT.x, y: -p.outT.y};
+      else if (p.mode === 'smooth') {
+        const lenIn = Math.hypot(p.inT.x, p.inT.y);
+        const lenOut = Math.hypot(p.outT.x, p.outT.y) || 1e-5;
+        p.inT = {x: -p.outT.x * lenIn / lenOut, y: -p.outT.y * lenIn / lenOut};
+      }
       const closed = isShapeClosed(s);
       const n = s.points.length;
       let nextIdx = (dragState.ptIdx + 1) % n;
@@ -1387,15 +1692,24 @@ function mDrawMove(pos,e){
         const p1 = s.points[nextIdx];
         currentCurvature = getCurvature(p, p.outT, p1, {x: -p1.inT.x, y: -p1.inT.y}, 0);
       }
+      syncCopies(s);
     }
     render();return;
   }
   if(dragState?.type==='cpIn'){
     const s=shapes.find(x=>x.id===dragState.shapeId);if(s){
       const p = s.points[dragState.ptIdx];
-      p.manual = true; // Mark as manually adjusted
-      p.inT = {x: pos.x - p.x, y: pos.y - p.y};
+      p.manual = true;
+      // grab 오프셋 적용
+      const tx = pos.x + (dragState.grabX||0);
+      const ty = pos.y + (dragState.grabY||0);
+      p.inT = {x: tx - p.x, y: ty - p.y};
       if (p.mode === 'sym') p.outT = {x: -p.inT.x, y: -p.inT.y};
+      else if (p.mode === 'smooth') {
+        const lenOut = Math.hypot(p.outT.x, p.outT.y);
+        const lenIn = Math.hypot(p.inT.x, p.inT.y) || 1e-5;
+        p.outT = {x: -p.inT.x * lenOut / lenIn, y: -p.inT.y * lenOut / lenIn};
+      }
       const closed = isShapeClosed(s);
       const n = s.points.length;
       let prevIdx = (dragState.ptIdx - 1 + n) % n;
@@ -1404,6 +1718,7 @@ function mDrawMove(pos,e){
         const p0 = s.points[prevIdx];
         currentCurvature = getCurvature(p0, p0.outT, p, {x: -p.inT.x, y: -p.inT.y}, 1);
       }
+      syncCopies(s);
     }
     render();return;
   }
@@ -1415,9 +1730,8 @@ function mDrawMove(pos,e){
       const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
       s.points[dragState.ptIdx].x=pLocal.x;
       s.points[dragState.ptIdx].y=pLocal.y;
-      if (s.type === 'spline') {
-        updateHermiteTangents(s);
-      }
+      if(s.type==='spline') updateHermiteTangents(s);
+      syncCopies(s);
     }
     render();return;
   }
@@ -1428,6 +1742,7 @@ function mDrawMove(pos,e){
       const dx=pos.x-dragState.startPos.x,dy=pos.y-dragState.startPos.y;
       s.points.forEach((p,i)=>{p.x=dragState.origPts[i].x+dx;p.y=dragState.origPts[i].y+dy;});
       if(s.cps&&dragState.origCps){s.cps.forEach((seg,i)=>{if(seg&&dragState.origCps[i]){seg[0]={x:dragState.origCps[i][0].x+dx,y:dragState.origCps[i][0].y+dy};seg[1]={x:dragState.origCps[i][1].x+dx,y:dragState.origCps[i][1].y+dy};}});}
+      syncCopies(s);
     }
     render();return;
   }
@@ -1451,32 +1766,13 @@ function mDrawMove(pos,e){
   if(willClose){ctx.strokeStyle='#00ff88';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p0.x*sc,p0.y*sc,8,0,Math.PI*2);ctx.stroke();}
   ctx.restore();
 }
+
 function mDrawUp(pos,e){
+  // 드래그가 있었으면 스냅셛 저장
+  if(dragState && _hasDragged) saveSnapshot();
   dragState=null;render();
 }
-function finishDrawing(){
-  if(!drawingShape){drawing=false;return;}
-  if(drawingShape.points.length>=2)shapes.push(drawingShape);
-  drawingShape=null;drawing=false;render();
-}
-function deleteSelectedShape(){
-  if(selShapeId!==null){shapes=shapes.filter(s=>s.id!==selShapeId);selShapeId=null;selPtIdx=null;dragState=null;}
-  render();
-}
-function clearAllShapes(){if(confirm('모든 도형을 삭제할까요?')){shapes=[];selShapeId=null;selPtIdx=null;render();}}
-function updatePropsPanel(){
-  if(selShapeId===null){document.getElementById('props-content').textContent='선택 없음';return;}
-  const s=shapes.find(x=>x.id===selShapeId);if(!s)return;
-  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  let h=`<b>도형 #${s.id}</b><br>타입: ${s.type}<br>두께: ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>그룹: ${g?'그룹'+g.label:'없음'}<br>점수: ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
-  if(selPtIdx!==null&&s.points[selPtIdx]){
-    const p=s.points[selPtIdx];
-    h+=`<br><br><b>??${selPtIdx}</b><br>x: ${p.x.toFixed(2)}<br>y: ${p.y.toFixed(2)}`;
-    if(s.type==='spline')h+=`<br><small style="color:#666">핸들 세부 보기<br>orange=입력, green=출력</small>`;
-  }
-  document.getElementById('props-content').innerHTML=h;
-}
-  // ── Arrange mode ──
+
 function mArrDown(pos,e){
   // Group marker
   for(const g of groups){
@@ -1497,10 +1793,12 @@ function mArrDown(pos,e){
   }
   arrSelShapeId=null;arrDragState=null;refreshGroupList();render();
 }
+
 function mArrMove(pos,e){
   if(!arrDragState||!_hasDragged)return;
   const ang=Math.atan2(pos.y-circle.cy,pos.x-circle.cx);
   if(arrDragState.type==='marker'){
+    if(arrDragState.groupId === GROUP1_ID) return;
     const g=groups.find(x=>x.id===arrDragState.groupId);
     if(g)g.rotation=arrDragState.startRot+(ang-arrDragState.startAng)*180/Math.PI;
     render();return;
@@ -1508,42 +1806,71 @@ function mArrMove(pos,e){
   if(arrDragState.type==='shape'){
     const origShape=shapes.find(x=>x.id===arrDragState.origId&&!x._isCopy)||shapes.find(x=>x.id===arrDragState.origId);
     if(!origShape)return;
-    const delta=(ang-arrDragState.startAng)*180/Math.PI;
-    const baseRot=arrDragState.origGroupId?groups.find(x=>x.id===arrDragState.origGroupId)?.rotation||0:0;
-    const targetRot=baseRot+delta;
+
+    // 마우스의 12시 기준 각도 (0~360): sin(ang)*r = x방향, -cos(ang)*r = y방향
+    const mouseAngle360 = (Math.atan2(pos.x - circle.cx, -(pos.y - circle.cy)) * 180 / Math.PI + 360) % 360;
+
     if(e.ctrlKey){
       if(!arrDragState.newGroupId){
-        const ng={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:0,locked:false};
+        const ng={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:mouseAngle360,locked:false};
         groups.push(ng);arrDragState.newGroupId=ng.id;refreshGroupList();
+        // 원래 그룹이 GROUP1이 아니면 이동 (원본 그룹에서 제거)
+        if(arrDragState.origGroupId !== GROUP1_ID){
+          removeCopy(origShape.id, arrDragState.origGroupId);
+          arrDragState.origGroupId = GROUP1_ID;
+        }
       }
       const ng=groups.find(x=>x.id===arrDragState.newGroupId);
-      if(ng)ng.rotation=targetRot;
-      if (!shapes.some(s => s._origId === origShape.id && s.groupId === arrDragState.newGroupId)) {
+      // 새 그룹 rotation을 마우스 각도로 실시간 업데이트
+      if(ng) ng.rotation = mouseAngle360;
+      if(!shapes.some(s=>s._origId===origShape.id&&s.groupId===arrDragState.newGroupId)){
         const copy=makeCopy(origShape,arrDragState.newGroupId);
         arrSelShapeId=copy.id;
       }
     } else {
-      let best=null,bestD=25;
-      groups.forEach(g=>{const diff=((targetRot-g.rotation)%360+360)%360;const d=Math.min(diff,360-diff);if(d<bestD){bestD=d;best=g;}});
+      // ctrl 뗐을 때: 생성된 새 그룹이 있으면 취소하고 snap 모드 복귀
+      if(arrDragState.newGroupId !== null){
+        groups = groups.filter(g => g.id !== arrDragState.newGroupId);
+        shapes = shapes.filter(s => !(s._isCopy && s.groupId === arrDragState.newGroupId));
+        arrDragState.newGroupId = null;
+        arrSelShapeId = origShape.id;
+        arrDragState.origGroupId = GROUP1_ID;
+        refreshGroupList();
+      }
+
+      // 각도 기반 snap: 마우스 12시 각도와 각 그룹 rotation(0~360) 비교
+      const SNAP_DEG = 25; // 25도 이내 snap
+      let best=null, bestDiff=SNAP_DEG;
+      groups.forEach(g=>{
+        const gAngle = ((g.rotation % 360) + 360) % 360;
+        const raw = Math.abs(mouseAngle360 - gAngle);
+        const circDiff = Math.min(raw, 360 - raw);
+        if(circDiff < bestDiff){ bestDiff = circDiff; best = g; }
+      });
       if(best && arrDragState.origGroupId !== best.id){
-        if(arrDragState.origGroupId !== GROUP1_ID) {
-           removeCopy(origShape.id, arrDragState.origGroupId);
+        if(arrDragState.origGroupId !== GROUP1_ID){
+          removeCopy(origShape.id, arrDragState.origGroupId);
         }
-        if(best.id === GROUP1_ID) {
-           arrSelShapeId = origShape.id;
-           arrDragState.origGroupId = GROUP1_ID;
+        if(best.id === GROUP1_ID){
+          arrSelShapeId = origShape.id;
+          arrDragState.origGroupId = GROUP1_ID;
         } else {
-           const copy = makeCopy(origShape, best.id);
-           arrSelShapeId = copy.id;
-           arrDragState.origGroupId = best.id;
+          const copy = makeCopy(origShape, best.id);
+          arrSelShapeId = copy.id;
+          arrDragState.origGroupId = best.id;
         }
       }
     }
     refreshGroupList();render();
   }
 }
-function mArrUp(pos,e){arrDragState=null;render();}
-  // ── Label mode ──
+
+function mArrUp(pos,e){
+  // 드래그가 있었으면 스냅셛 저장
+  if(arrDragState && _hasDragged) saveSnapshot();
+  arrDragState=null;render();
+}
+
 function mLblDown(pos,e){
   for(const s of shapes){
     if(!s.groupId)continue;
@@ -1558,6 +1885,7 @@ function mLblDown(pos,e){
   }
   lblDrag=null;
 }
+
 function mLblMove(pos,e){
   if(!lblDrag)return;
   const s=shapes.find(x=>x.id===lblDrag.shapeId);if(!s)return;
@@ -1575,62 +1903,598 @@ function mLblMove(pos,e){
   if(!labels[s.id])labels[s.id]={ox:4,oy:-4};
   labels[s.id].ox=ox;labels[s.id].oy=oy;render();
 }
+
 function mLblUp(pos){lblDrag=null;render();}
-function rotAround(pos,cx,cy,deg){
-  const r=deg*Math.PI/180,dx=pos.x-cx,dy=pos.y-cy;
-  return{x:cx+dx*Math.cos(r)-dy*Math.sin(r),y:cy+dx*Math.sin(r)+dy*Math.cos(r)};
-}
-  // ── Keyboard ──
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    if(currentMode==='draw')setDrawTool('select');
+
+function finishDrawing(){
+  if(!drawingShape){drawing=false;return;}
+  if(drawingShape.points.length>=2){
+    if(drawingShape.type==='spline') updateHermiteTangents(drawingShape);
+    shapes.push(drawingShape);
+    saveSnapshot(); // 도형 그리기 완료 시 저장
   }
-  if((e.key==='Delete'||e.key==='Backspace')&&!e.target.matches('input,textarea')){
-    if(currentMode==='draw')deleteSelectedShape();
-    else if(currentMode==='canvas' && canvSelType==='image' && canvSelId!==null) {
-      images = images.filter(x => x.id !== canvSelId);
-      canvSelId = null;
-      canvSelType = null;
-      render();
+  drawingShape=null;drawing=false;render();
+  triggerAutosave();
+}
+
+// --- ui.js --- 
+function showContextMenu(e, items){
+  const cm = document.getElementById('context-menu');
+  cm.innerHTML = '';
+  items.forEach(item => {
+    const btn = document.createElement('div');
+    btn.textContent = item.label;
+    btn.style.padding = '6px 12px';
+    btn.style.fontSize = '12px';
+    btn.style.color = '#eee';
+    btn.style.cursor = 'pointer';
+    btn.onmouseenter = () => btn.style.background = '#1a5a9a';
+    btn.onmouseleave = () => btn.style.background = 'transparent';
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      item.action();
+      cm.style.display = 'none';
+    };
+    cm.appendChild(btn);
+  });
+  cm.style.left = e.clientX + 'px';
+  cm.style.top = e.clientY + 'px';
+  cm.style.display = 'block';
+}
+
+function deleteSelectedShape(){
+  if(selShapeId!==null){
+    saveSnapshot(); // 삭제 전 저장
+    shapes=shapes.filter(s=>s.id!==selShapeId);selShapeId=null;selPtIdx=null;dragState=null;
+  }
+  render();
+  triggerAutosave();
+}
+
+function clearAllShapes(){if(confirm('모든 도형을 삭제할까요?')){saveSnapshot();shapes=[];selShapeId=null;selPtIdx=null;render();triggerAutosave();}}
+
+function updatePropsPanel(){
+  if(selShapeId===null){
+    document.getElementById('props-content').textContent='선택 없음';
+    // 선택 없으면 opacity 슬라이더 1로 리셋
+    const opr=document.getElementById('shape-opacity-range');
+    const opn=document.getElementById('shape-opacity-num');
+    if(opr){opr.value='1';opn.value='1.00';}
+    return;
+  }
+  const s=shapes.find(x=>x.id===selShapeId);if(!s)return;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  let h=`<b>도형 #${s.id}</b><br>타입: ${s.type}<br>두께: ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>그룹: ${g?'그룹'+g.label:'없음'}<br>점수: ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
+  if(selPtIdx!==null&&s.points[selPtIdx]){
+    const p=s.points[selPtIdx];
+    h+=`<br><br><b>점${selPtIdx}</b><br>x: ${p.x.toFixed(2)}<br>y: ${p.y.toFixed(2)}`;
+    if(s.type==='spline')h+=`<br><small style="color:#666">핸들 세부 보기<br>orange=입력, green=출력</small>`;
+  }
+  document.getElementById('props-content').innerHTML=h;
+  // 선택 도형의 opacity로 슬라이더 업데이트
+  const opVal = (s.opacity !== undefined ? s.opacity : 1.0).toFixed(2);
+  const opr=document.getElementById('shape-opacity-range');
+  const opn=document.getElementById('shape-opacity-num');
+  if(opr){opr.value=opVal;opn.value=opVal;}
+}
+
+function updateCursor(){
+  if(currentMode==='draw'&&drawTool!=='select')mainCanvas.style.cursor='crosshair';
+  else mainCanvas.style.cursor='default';
+}
+
+function setMode(m){
+  if(drawing)finishDrawing();
+  currentMode=m;
+  
+  // 그룹 1 검증 및 방어
+  let g1 = groups.find(g => g.id === GROUP1_ID);
+  if (!g1) {
+    groups.unshift({id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true});
+  } else {
+    g1.rotation = 0;
+    g1.locked = true;
+  }
+  
+  ['canvas','draw','arrange','label'].forEach(mm=>{
+    document.getElementById('mode-'+mm).classList.toggle('active',mm===m);
+    const p=document.getElementById('panel-'+mm);if(p)p.style.display=mm===m?'':'none';
+  });
+  document.getElementById('sb-mode').textContent='모드: '+MODE_NAMES[m];
+  selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;
+  arrSelShapeId=null;arrDragState=null;hoverPtRef=null;lblDrag=null;
+  
+  if(m==='arrange'||m==='label') refreshGroupList();
+  updateCursor();render();
+}
+
+function setDrawTool(t){
+  if(drawing)finishDrawing();
+  drawTool=t;
+  ['spline','line','select'].forEach(tt=>document.getElementById('tool-'+tt).classList.toggle('active',tt===t));
+  selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;hoverPtRef=null;
+    
+  updateCursor();render();
+}
+
+function onPaperSizeChange(val) {
+  if (val === 'Custom') {
+    document.getElementById('cv-w').disabled = false;
+    document.getElementById('cv-h').disabled = false;
+  } else {
+    document.getElementById('cv-w').disabled = true;
+    document.getElementById('cv-h').disabled = true;
+    if (val === 'A4') { paperGuide.w = 210; paperGuide.h = 297; }
+    else if (val === 'A3') { paperGuide.w = 297; paperGuide.h = 420; }
+    else if (val === 'Letter') { paperGuide.w = 215.9; paperGuide.h = 279.4; }
+    document.getElementById('cv-w').value = paperGuide.w;
+    document.getElementById('cv-h').value = paperGuide.h;
+  }
+  paperGuide.size = val;
+  canvasW = paperGuide.w;
+  canvasH = paperGuide.h;
+  paperGuide.cx = canvasW / 2;
+  paperGuide.cy = canvasH / 2;
+  paperGuide.rotation = 0;
+  circle.cx = canvasW / 2;
+  circle.cy = canvasH / 2;
+  setCanvasSize();
+  render();
+  triggerAutosave();
+}
+
+function onCustomPaperWH(axis, val) {
+  const v = parseFloat(val);
+  if (!isNaN(v) && v > 0) {
+    if (axis === 'w') { paperGuide.w = v; canvasW = v; }
+    if (axis === 'h') { paperGuide.h = v; canvasH = v; }
+    paperGuide.cx = canvasW / 2;
+    paperGuide.cy = canvasH / 2;
+    paperGuide.rotation = 0;
+    circle.cx = canvasW / 2;
+    circle.cy = canvasH / 2;
+    setCanvasSize();
+    render();
+    triggerAutosave();
+  }
+}
+
+function importImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => onImageObjectLoaded(img);
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function onImageObjectLoaded(img) {
+  let w = paperGuide.w * 0.6;
+  let h = w * img.height / img.width;
+  if (h > paperGuide.h * 0.6) {
+    h = paperGuide.h * 0.6;
+    w = h * img.width / img.height;
+  }
+  images.push({
+    id: nextImgId++,
+    img: img,
+    cx: paperGuide.cx,
+    cy: paperGuide.cy,
+    w: w,
+    h: h,
+    rotation: 0,
+    opacity: 1.0
+  });
+  render();
+  triggerAutosave();
+}
+
+function circleFromInput() { circle.r=(parseFloat(document.getElementById('circle-d').value)||150)/2; render(); triggerAutosave(); }
+
+function initDefaultGroup() {
+  groups=[{id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true}];
+  activeDrawGroupId=GROUP1_ID;
+}
+
+function addGroup() {
+  saveSnapshot();
+  const g={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:0,locked:false};
+  groups.push(g); refreshGroupList(); render(); triggerAutosave();
+}
+
+function deleteGroup(id) {
+  if(id===GROUP1_ID)return;
+  saveSnapshot();
+  shapes=shapes.filter(s=>!(s.groupId===id&&s._isCopy));
+  groups=groups.filter(g=>g.id!==id);
+  refreshGroupList(); render(); triggerAutosave();
+}
+
+function hasCopy(origId)  { return shapes.some(s=>s._origId===origId); }
+
+// 원본이 수정됐을 때 연결된 copy들에 형태 데이터를 동기화
+function syncCopies(origShape) {
+  shapes.forEach(s => {
+    if (!s._isCopy || s._origId !== origShape.id) return;
+    s.points = JSON.parse(JSON.stringify(origShape.points));
+    s.type = origShape.type;
+    s.closed = origShape.closed;
+    s.strokeWidth = origShape.strokeWidth;
+    if (origShape.opacity !== undefined) s.opacity = origShape.opacity;
+  });
+}
+
+function makeCopy(orig, targetGid) {
+  shapes=shapes.filter(s=>!(s._origId===orig.id&&s.groupId===targetGid));
+  const c=JSON.parse(JSON.stringify(orig));
+  c.id=nextShapeId++; c._isCopy=true; c._origId=orig.id; c.groupId=targetGid;
+  shapes.push(c); return c;
+}
+
+function removeCopy(origId, targetGid) { shapes=shapes.filter(s=>!(s._origId===origId&&s.groupId===targetGid)); }
+
+function refreshGroupList() {
+  // Arrange list
+  const list=document.getElementById('group-list');
+  list.innerHTML='';
+  groups.forEach(g=>{
+    const d=document.createElement('div');
+    d.className='group-item';
+    const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
+    const isG1 = g.id === GROUP1_ID;
+    const rotInputHtml = isG1 ? 
+      `<input type="number" value="0" disabled style="width:55px; background:#2c2c2e; color:#8e8e93; border:none; cursor:not-allowed;">` :
+      `<input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">`;
+    d.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1">그룹 ${g.label}</span>${rotInputHtml}${delHtml}`;
+    list.appendChild(d);
+  });
+  // Label panel
+  const ll=document.getElementById('label-group-list');
+  ll.innerHTML='';
+  groups.forEach(g=>{
+    const row=document.createElement('div');
+    row.className='input-row';
+    row.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1;font-size:12px">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
+    ll.appendChild(row);
+  });
+}
+
+function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render(); triggerAutosave();}}
+
+function onSwRange(v){
+  strokeWidth=parseFloat(v);
+  document.getElementById('sw-num').value=strokeWidth.toFixed(2);
+  shapes.forEach(s=>s.strokeWidth=strokeWidth);
+  render();
+  triggerAutosave();
+}
+
+function onSwNum(v){
+  strokeWidth=Math.max(0.5,Math.min(2,parseFloat(v)||1));
+  document.getElementById('sw-range').value=strokeWidth;
+  shapes.forEach(s=>s.strokeWidth=strokeWidth);
+  render();
+  triggerAutosave();
+}
+
+function onImageFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => onImageObjectLoaded(img);
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function setSplineAlgo(algo) {
+  currentSplineAlgo = algo;
+  ['natural', 'catmull', 'bspline'].forEach(a => {
+    const btn = document.getElementById('algo-' + a);
+    if (btn) btn.classList.toggle('active', a === algo);
+  });
+  shapes.forEach(s => {
+    if (s.type === 'spline') {
+      updateHermiteTangents(s);
+    }
+  });
+  if (drawingShape && drawingShape.type === 'spline') {
+    updateHermiteTangents(drawingShape);
+  }
+  render();
+  triggerAutosave();
+}
+
+function setGroupRotation(id, v) {
+  if (id === GROUP1_ID) return;
+  const g = groups.find(x => x.id === id);
+  if (g) {
+    g.rotation = parseFloat(v) || 0;
+    render();
+    triggerAutosave();
+  }
+}
+
+// 이미지 불투명도 조절 (선택된 이미지 또는 전체)
+function _setImgOpacityVal(v) {
+  const val = Math.max(0.05, Math.min(1, parseFloat(v) || 1));
+  document.getElementById('img-opacity-range').value = val;
+  document.getElementById('img-opacity-num').value = val.toFixed(2);
+  if (canvSelType === 'image' && canvSelId !== null) {
+    const img = images.find(x => x.id === canvSelId);
+    if (img) { img.opacity = val; }
+  } else {
+    images.forEach(img => { img.opacity = val; });
+  }
+  render(); triggerAutosave();
+}
+function onImgOpacity(v) { _setImgOpacityVal(v); }
+function onImgOpacityNum(v) { _setImgOpacityVal(v); }
+
+// 도형 불투명도 조절 (선택된 도형 또는 전체)
+function _setShapeOpacityVal(v) {
+  const val = Math.max(0.05, Math.min(1, parseFloat(v) || 1));
+  document.getElementById('shape-opacity-range').value = val;
+  document.getElementById('shape-opacity-num').value = val.toFixed(2);
+  if (selShapeId !== null) {
+    const s = shapes.find(x => x.id === selShapeId);
+    if (s) {
+      s.opacity = val;
+      syncCopies(s);
+    }
+  } else {
+    shapes.forEach(s => { s.opacity = val; });
+  }
+  render(); triggerAutosave();
+}
+function onShapeOpacity(v) { _setShapeOpacityVal(v); }
+function onShapeOpacityNum(v) { _setShapeOpacityVal(v); }
+
+let scaleStartShapes = null;
+let shapeScaleStartValue = 100;
+
+function prepareShapeScale(val) {
+  if (!scaleStartShapes) {
+    saveSnapshot(); // Save history snapshot BEFORE modification
+    scaleStartShapes = JSON.parse(JSON.stringify(shapes));
+    shapeScaleStartValue = parseFloat(val) || 100;
+  }
+}
+
+function onShapeScaleRange(val) {
+  const v = parseFloat(val);
+  if (isNaN(v)) return;
+  if (v < 10) return;
+  
+  prepareShapeScale(v);
+  
+  const s = v / shapeScaleStartValue;
+  shapes = JSON.parse(JSON.stringify(scaleStartShapes));
+  shapes.forEach(shape => {
+    shape.points.forEach(p => {
+      p.x = circle.cx + (p.x - circle.cx) * s;
+      p.y = circle.cy + (p.y - circle.cy) * s;
+      if (p.inT) { p.inT.x *= s; p.inT.y *= s; }
+      if (p.outT) { p.outT.x *= s; p.outT.y *= s; }
+    });
+  });
+  document.getElementById('shape-scale-num').value = v.toFixed(0);
+  render();
+}
+
+function onShapeScaleNum(val) {
+  const v = parseFloat(val);
+  if (isNaN(v)) return;
+  if (v < 10) return;
+  
+  prepareShapeScale(v);
+  
+  const s = v / shapeScaleStartValue;
+  shapes = JSON.parse(JSON.stringify(scaleStartShapes));
+  shapes.forEach(shape => {
+    shape.points.forEach(p => {
+      p.x = circle.cx + (p.x - circle.cx) * s;
+      p.y = circle.cy + (p.y - circle.cy) * s;
+      if (p.inT) { p.inT.x *= s; p.inT.y *= s; }
+      if (p.outT) { p.outT.x *= s; p.outT.y *= s; }
+    });
+  });
+  document.getElementById('shape-scale-range').value = v;
+  render();
+}
+
+function onShapeScaleChange() {
+  if (scaleStartShapes) {
+    saveSnapshot(); // Save history snapshot AFTER modification completes
+    triggerAutosave();
+    scaleStartShapes = null;
+  }
+}
+
+function getSelectedCanvasImage() {
+  if (canvSelType === 'image' && canvSelId !== null) {
+    return images.find(x => x.id === canvSelId);
+  }
+  return null;
+}
+
+function onImgWidthRange(val) {
+  const img = getSelectedCanvasImage();
+  if (!img) return;
+  const w = parseFloat(val);
+  if (isNaN(w) || w < 10) return;
+  const aspect = img.img.height / img.img.width;
+  img.w = w;
+  img.h = w * aspect;
+  document.getElementById('img-width-num').value = Math.round(w);
+  render();
+}
+
+function onImgWidthNum(val) {
+  const img = getSelectedCanvasImage();
+  if (!img) return;
+  const w = parseFloat(val);
+  if (isNaN(w) || w < 10) return;
+  const aspect = img.img.height / img.img.width;
+  img.w = w;
+  img.h = w * aspect;
+  document.getElementById('img-width-range').value = Math.round(w);
+  render();
+}
+
+function onImgWidthChange() {
+  saveSnapshot();
+  triggerAutosave();
+}
+
+function updateImageSizeUI() {
+  const img = getSelectedCanvasImage();
+  const range = document.getElementById('img-width-range');
+  const num = document.getElementById('img-width-num');
+  if (range && num) {
+    if (img) {
+      range.disabled = false;
+      num.disabled = false;
+      if (document.activeElement !== range) range.value = Math.round(img.w);
+      if (document.activeElement !== num) num.value = Math.round(img.w);
+    } else {
+      range.disabled = true;
+      num.disabled = true;
+      range.value = 100;
+      num.value = 100;
     }
   }
-});
-// ═══════════════════════════════════════════════
-//  SAVE / LOAD / EXPORT
-// ═══════════════════════════════════════════════
-function saveProject(){
-  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.rdraw';a.click();
 }
-function loadProject(){document.getElementById('proj-input').click();}
+
+
+// --- export.js --- 
+async function saveProject(){
+  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
+  const jsonStr = JSON.stringify(data, null, 2);
+  
+  if (window.showSaveFilePicker && currentFileHandle) {
+    try {
+      const options = { mode: 'readwrite' };
+      if ((await currentFileHandle.queryPermission(options)) !== 'granted') {
+        if ((await currentFileHandle.requestPermission(options)) !== 'granted') {
+          alert('저장 권한이 거부되었습니다.');
+          return;
+        }
+      }
+      const writable = await currentFileHandle.createWritable();
+      await writable.write(jsonStr);
+      await writable.close();
+    } catch (err) {
+      console.warn('기존 파일 덮어쓰기 실패, 다른 이름으로 저장을 시도합니다.', err);
+      await saveProjectAs();
+    }
+  } else {
+    await saveProjectAs();
+  }
+}
+
+async function saveProjectAs(){
+  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
+  const jsonStr = JSON.stringify(data, null, 2);
+  
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'rotadraw.rdraw',
+        types: [{
+          description: 'Rotadraw Project',
+          accept: {
+            'application/json': ['.rdraw', '.json']
+          }
+        }]
+      });
+      currentFileHandle = handle;
+      const writable = await handle.createWritable();
+      await writable.write(jsonStr);
+      await writable.close();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert('저장 오류: ' + err.message);
+      }
+    }
+  } else {
+    const blob=new Blob([jsonStr],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.rdraw';a.click();
+  }
+}
+
+function applyProjectData(d){
+  canvasW=d.canvasW||200;canvasH=d.canvasH||200;baseW=d.baseW||canvasW;baseH=d.baseH||canvasH;
+  paperGuide.w = canvasW;
+  paperGuide.h = canvasH;
+  paperGuide.cx = canvasW / 2;
+  paperGuide.cy = canvasH / 2;
+  paperGuide.rotation = 0;
+  circle=d.circle||{cx:100,cy:100,r:75};
+  shapes=d.shapes||[];nextShapeId=shapes.reduce((m,s)=>Math.max(m,s.id+1),1);
+  groups=d.groups||[];
+  let g1 = groups.find(g => g.id === GROUP1_ID);
+  if (!g1) {
+    groups.unshift({id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true});
+  } else {
+    g1.rotation = 0;
+    g1.locked = true;
+  }
+  nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
+  labels=d.labels||{};strokeWidth=d.strokeWidth||1;activeDrawGroupId=groups.find(g=>g.id===GROUP1_ID)?.id || groups[0].id;
+  document.getElementById('cv-w').value=canvasW;document.getElementById('cv-h').value=canvasH;
+  document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
+  document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
+  document.getElementById('sw-num').value=strokeWidth.toFixed(2);document.getElementById('sw-range').value=strokeWidth;
+  refreshGroupList();setCanvasSize();render();
+  triggerAutosave();
+}
+
+async function loadProject(){
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'Rotadraw Project',
+          accept: {
+            'application/json': ['.rdraw', '.json']
+          }
+        }]
+      });
+      currentFileHandle = handle;
+      const file = await handle.getFile();
+      const text = await file.text();
+      const d = JSON.parse(text);
+      applyProjectData(d);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert('불러오기 오류: ' + err.message);
+      }
+    }
+  } else {
+    document.getElementById('proj-input').click();
+  }
+}
+
 function onProjectLoaded(e){
   const file=e.target.files[0];if(!file)return;
+  currentFileHandle = null;
   const rd=new FileReader();
   rd.onload=ev=>{
     try{
       const d=JSON.parse(ev.target.result);
-      canvasW=d.canvasW||200;canvasH=d.canvasH||200;baseW=d.baseW||canvasW;baseH=d.baseH||canvasH;
-      paperGuide.w = canvasW;
-      paperGuide.h = canvasH;
-      paperGuide.cx = canvasW / 2;
-      paperGuide.cy = canvasH / 2;
-      paperGuide.rotation = 0;
-      circle=d.circle||{cx:100,cy:100,r:75};
-      shapes=d.shapes||[];nextShapeId=shapes.reduce((m,s)=>Math.max(m,s.id+1),1);
-      groups=d.groups||[];nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
-      if(!groups.length)initDefaultGroup();
-      labels=d.labels||{};strokeWidth=d.strokeWidth||1;activeDrawGroupId=groups[0].id;
-      document.getElementById('cv-w').value=canvasW;document.getElementById('cv-h').value=canvasH;
-      document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
-      document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
-      document.getElementById('sw-num').value=strokeWidth.toFixed(2);document.getElementById('sw-range').value=strokeWidth;
-      syncAspectSlider();refreshGroupList();setCanvasSize();render();
+      applyProjectData(d);
     }catch(err){alert('파일 오류: '+err.message);}
   };
   rd.readAsText(file);e.target.value='';
 }
+
 function showExportModal(){document.getElementById('export-modal').style.display='flex';}
+
 function renderOffscreen(mmScale){
   const oc=document.createElement('canvas');
   oc.width=Math.round(paperGuide.w*mmScale);oc.height=Math.round(paperGuide.h*mmScale);
@@ -1652,17 +2516,76 @@ function renderOffscreen(mmScale){
     const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
     oc2.save();
     if(g&&g.rotation!==0){oc2.translate(circle.cx*mmScale,circle.cy*mmScale);oc2.rotate(g.rotation*Math.PI/180);oc2.translate(-circle.cx*mmScale,-circle.cy*mmScale);}
-    const path=getShapePath(s,mmScale);
-    if(path){oc2.fillStyle=g?g.color:'#000';oc2.fill(path,'evenodd');}
+    
+    const color = g ? g.color : '#000';
+    const {pts, closed} = getPolyline(s);
+    if(pts.length>=2){
+      oc2.beginPath();
+      oc2.moveTo(pts[0].x * mmScale, pts[0].y * mmScale);
+      pts.slice(1).forEach(p => oc2.lineTo(p.x * mmScale, p.y * mmScale));
+      oc2.lineJoin = 'miter';
+      oc2.lineCap = 'round';
+      if(closed){
+        oc2.closePath();
+        oc2.fillStyle = color;
+        oc2.fill();
+        oc2.strokeStyle = color;
+        oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+        oc2.stroke();
+      } else {
+        oc2.strokeStyle = color;
+        oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+        oc2.stroke();
+      }
+    }
     oc2.restore();
   });
+  
+  // 가이드 원 오프스크린 렌더링 추가
+  const circleCx = circle.cx * mmScale, circleCy = circle.cy * mmScale, circleR = circle.r * mmScale;
+  oc2.save();
+  oc2.strokeStyle = '#4488ffaa'; oc2.lineWidth = 0.5 * mmScale;
+  oc2.setLineDash([5 * mmScale, 5 * mmScale]);
+  oc2.beginPath(); oc2.arc(circleCx, circleCy, circleR, 0, Math.PI*2); oc2.stroke();
+  oc2.setLineDash([]);
+  oc2.fillStyle = '#4488ffcc'; oc2.beginPath(); oc2.arc(circleCx, circleCy, 2.5 * mmScale, 0, Math.PI*2); oc2.fill();
+  oc2.restore();
+  
+  // 그룹 마커 핸들 오프스크린 렌더링 추가
+  groups.forEach(g => {
+    const mRadHalf = 3 * mmScale;
+    const mTangHalf = 0.5 * mmScale;
+    oc2.save();
+    oc2.translate(circle.cx * mmScale, circle.cy * mmScale);
+    oc2.rotate(g.rotation * Math.PI / 180);
+    const edgeY = -(circle.r * mmScale);
+    oc2.fillStyle = g.color + 'bb';
+    oc2.strokeStyle = g.color;
+    oc2.lineWidth = 1 * mmScale;
+    oc2.beginPath();
+    oc2.rect(-mTangHalf, edgeY - mRadHalf, mTangHalf * 2, mRadHalf * 2);
+    oc2.fill(); oc2.stroke();
+    
+    // Label to the right
+    oc2.fillStyle = '#fff';
+    oc2.font = `bold ${3.5 * mmScale}px sans-serif`;
+    oc2.textAlign = 'left'; oc2.textBaseline = 'middle';
+    oc2.fillText(g.label, mTangHalf + 4 * mmScale, edgeY);
+    oc2.restore();
+  });
+
   oc2.restore();
   return oc;
 }
+
 function exportPNG(){document.getElementById('export-modal').style.display='none';renderOffscreen(EXPORT_MM).toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='rotadraw.png';a.click();});}
+
 function getGlobalBounds() {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const addPt = (x, y) => { minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); };
+  // Include guide circle bounds
+  addPt(circle.cx - circle.r, circle.cy - circle.r);
+  addPt(circle.cx + circle.r, circle.cy + circle.r);
   shapes.forEach(s => {
      if(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))return;
      const g = s.groupId ? groups.find(x=>x.id===s.groupId) : null;
@@ -1680,9 +2603,10 @@ function getGlobalBounds() {
      addPt(tl.x, tl.y); addPt(tr.x, tr.y); addPt(br.x, br.y); addPt(bl.x, bl.y);
   });
   if (minX === Infinity) return {x:0, y:0, w:100, h:100};
-  minX -= 10; minY -= 10; maxX += 10; maxY += 10;
+  minX -= 5; minY -= 5; maxX += 5; maxY += 5;
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
+
 function exportSVG(){
   document.getElementById('export-modal').style.display='none';
   const bounds = getGlobalBounds();
@@ -1694,29 +2618,63 @@ function exportSVG(){
   groups.forEach(g=>{
     svg+=`<g transform="rotate(${g.rotation},${circle.cx},${circle.cy})">\n`;
     shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
-      const d=svgPathD(s);if(d)svg+=`  <path d="${d}" fill="${g.color}" fill-rule="evenodd"/>\n`;
+      const d=svgPathD(s);
+      if(d){
+        const sw = s.strokeWidth || strokeWidth;
+        if(s.closed){
+          svg+=`  <path d="${d}" fill="${g.color}" stroke="${g.color}" stroke-width="${sw}" stroke-linejoin="miter" />\n`;
+        } else {
+          svg+=`  <path d="${d}" fill="none" stroke="${g.color}" stroke-width="${sw}" stroke-linejoin="miter" stroke-linecap="round" />\n`;
+        }
+      }
     });
     svg+=`</g>\n`;
   });
+  
+  // 가이드 원 SVG 추가 (중심 원 실선)
+  svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="${circle.r.toFixed(2)}" stroke="#4488ff" stroke-opacity="0.67" stroke-width="0.5" stroke-dasharray="5,5" fill="none" />\n`;
+  svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="2.5" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="0.4" />\n`;
+  
+  // 그룹 마커 핸들 SVG 추가
+  groups.forEach(g => {
+    const edgeY = -circle.r;
+    svg += `  <g transform="rotate(${g.rotation}, ${circle.cx}, ${circle.cy})">\n`;
+    svg += `    <rect x="-0.5" y="${(edgeY - 3).toFixed(2)}" width="1" height="6" fill="${g.color}" fill-opacity="0.73" stroke="${g.color}" stroke-width="0.5" />\n`;
+    svg += `    <text x="4.5" y="${edgeY.toFixed(2)}" fill="#ffffff" font-family="sans-serif" font-weight="bold" font-size="3.5" dominant-baseline="middle" text-anchor="start">${g.label}</text>\n`;
+    svg += `  </g>\n`;
+  });
+
   svg+='</svg>';
   const blob=new Blob([svg],{type:'image/svg+xml'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.svg';a.click();
 }
-function svgPathD(s){
-  // Use bezier curves directly for spline, polyline for line
-  if(s.type==='spline'){
-    const closed=isShapeClosed(s);
-    const rawPts=s.points;
-    const rn=rawPts.length;if(rn<2)return null;
-    const hw=(s.strokeWidth||strokeWidth)/2;
-    // Sample polyline then build offset
-    const{pts}=getPolyline(s);
-    return svgOffsetPathD(pts,closed,hw);
+
+function svgPathD(s) {
+  if (s.type === 'spline') {
+    const closed = s.closed === true;
+    const rawPts = s.points;
+    const rn = rawPts.length;
+    if (rn < 2) return null;
+    const segs = closed ? rn : rn - 1;
+    let d = `M ${rawPts[0].x.toFixed(2)} ${rawPts[0].y.toFixed(2)} `;
+    for (let i = 0; i < segs; i++) {
+      const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
+      const c0 = {x: p0.x + p0.outT.x, y: p0.y + p0.outT.y};
+      const c1 = {x: p1.x + p1.inT.x, y: p1.y + p1.inT.y};
+      d += `C ${c0.x.toFixed(2)} ${c0.y.toFixed(2)}, ${c1.x.toFixed(2)} ${c1.y.toFixed(2)}, ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} `;
+    }
+    if (closed) d += 'Z';
+    return d;
   }
-  const{pts,closed}=getPolyline(s);
-  if(pts.length<2)return null;
-  return svgOffsetPathD(pts,closed,(s.strokeWidth||strokeWidth)/2);
+  const closed = s.closed === true;
+  const rawPts = s.points;
+  if (rawPts.length < 2) return null;
+  let d = `M ${rawPts[0].x.toFixed(2)} ${rawPts[0].y.toFixed(2)} `;
+  rawPts.slice(1).forEach(p => d += `L ${p.x.toFixed(2)} ${p.y.toFixed(2)} `);
+  if (closed) d += 'Z';
+  return d;
 }
+
 function svgOffsetPathD(pts,closed,hw){
   const n=pts.length;if(n<2)return null;
   const f=v=>v.toFixed(3);
@@ -1754,6 +2712,7 @@ function svgOffsetPathD(pts,closed,hw){
     d+=` M${f(I[n-1].x)} ${f(I[n-1].y)}`;for(let i=n-2;i>=0;i--)d+=` L${f(I[i].x)} ${f(I[i].y)}`;return d+' Z';
   }
 }
+
 function exportDXF(){
   document.getElementById('export-modal').style.display='none';
   let dxf='0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
@@ -1769,6 +2728,7 @@ function exportDXF(){
   const blob=new Blob([dxf],{type:'application/dxf'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.dxf';a.click();
 }
+
 function exportPDF(){
   document.getElementById('export-modal').style.display='none';
   const oc=renderOffscreen(EXPORT_MM);
@@ -1777,9 +2737,8 @@ function exportPDF(){
   win.document.write(`<!DOCTYPE html><html><head><style>@page{size:${paperGuide.w}mm ${paperGuide.h}mm;margin:0}body{margin:0}img{width:${paperGuide.w}mm;height:${paperGuide.h}mm}</style></head><body><img src="${url}"></body></html>`);
   win.document.close();win.onload=()=>win.print();
 }
-// ═══════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════
+
+// --- main.js --- 
 function init(){
   initDefaultGroup();refreshGroupList();setCanvasSize();
   const ar=canvasArea.getBoundingClientRect();
@@ -1789,10 +2748,268 @@ function init(){
     viewOffX=(ar.width-canvasW*MM*viewScale)/2;
     viewOffY=(ar.height-canvasH*MM*viewScale)/2;
   }
-  setCanvasSize();setMode('canvas');render();
+  setCanvasSize();
+  const loaded = loadAutosave();
+  if(!loaded) {
+    setMode('canvas');
+  } else {
+    setMode(currentMode);
+  }
+  render();
 }
-window.addEventListener('resize',()=>render());
-requestAnimationFrame(()=>requestAnimationFrame(init));
+
+function setCanvasSize() {
+  // 뷰포트 크기로 고정 - 줌과 무관하게 캔버스 크기 일정
+  const ar = canvasArea.getBoundingClientRect();
+  const pw = Math.max(1, Math.round(ar.width));
+  const ph = Math.max(1, Math.round(ar.height));
+  bgCanvas.width  = mainCanvas.width  = pw;
+  bgCanvas.height = mainCanvas.height = ph;
+  bgCanvas.style.width  = mainCanvas.style.width  = pw+'px';
+  bgCanvas.style.height = mainCanvas.style.height = ph+'px';
+  wrapper.style.width  = pw+'px';
+  wrapper.style.height = ph+'px';
+  // wrapper는 항상 (0,0) - 오프셋은 render() 내 ctx.translate로 처리
+  wrapper.style.left = '0px';
+  wrapper.style.top  = '0px';
+}
+
+function goHome() {
+  const ar = canvasArea.getBoundingClientRect();
+  if (ar.width > 0 && ar.height > 0) {
+    viewScale = Math.min((ar.width - 60) / (paperGuide.w * MM), (ar.height - 60) / (paperGuide.h * MM), 2);
+    viewOffX = (ar.width - paperGuide.w * MM * viewScale) / 2;
+    viewOffY = (ar.height - paperGuide.h * MM * viewScale) / 2;
+    render();
+  }
+}
+
+window.addEventListener('mousemove', e => { if(_pan){viewOffX=e.clientX-_panO.x;viewOffY=e.clientY-_panO.y;render();} });
+window.addEventListener('mouseup',   e => { if(e.button===1)_pan=false; });
+// ═══════════════════════════════════════════════
+//  CANVAS SIZE CONTROLS
+// ═══════════════════════════════════════════════
+
+
+
+
+
+// Handle file dropping for images
+document.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    if (file.type.startsWith('image/')) {
+      importImage(file);
+    } else if (file.name.endsWith('.json') || file.name.endsWith('.rdraw')) {
+      onProjectLoaded({target:{files:[file]}});
+    }
+  }
+});
+
+window.addEventListener('mouseup',e=>{
+  if(e.button!==0)return;
+  if(_mdMm){
+    const p=clientToMm(e);
+    if(currentMode==='canvas')mCanvasUp(p);
+    else if(currentMode==='draw')mDrawUp(p,e);
+    else if(currentMode==='arrange')mArrUp(p,e);
+    else if(currentMode==='label')mLblUp(p);
+  }
+  _mdMm=null;
+  _hasDragged=false;
+  triggerAutosave();
+});
+
+window.addEventListener('click', () => {
+  const cm = document.getElementById('context-menu');
+  if(cm) cm.style.display = 'none';
+});
+
+mainCanvas.addEventListener('mousedown',e=>{if(e.button!==0)return;const p=clientToMm(e);_mdMm=p;_hasDragged=false;
+  if(currentMode==='canvas')mCanvasDown(p,e);
+  else if(currentMode==='draw')mDrawDown(p,e);
+  else if(currentMode==='arrange')mArrDown(p,e);
+  else if(currentMode==='label')mLblDown(p,e);
+});
+
+mainCanvas.addEventListener('mousemove',e=>{
+  const p=clientToMm(e);
+  if(_mdMm&&Math.hypot(p.x-_mdMm.x,p.y-_mdMm.y)>0.6)_hasDragged=true;
+  document.getElementById('sb-pos').textContent=`x: ${p.x.toFixed(1)}  y: ${p.y.toFixed(1)} mm`;
+  if(currentMode==='canvas')mCanvasMove(p,e);
+  else if(currentMode==='draw')mDrawMove(p,e);
+  else if(currentMode==='arrange')mArrMove(p,e);
+  else if(currentMode==='label')mLblMove(p,e);
+});
+
+mainCanvas.addEventListener('dblclick',e=>{if(currentMode==='draw'&&drawTool!=='select')finishDrawing();});
+
+
+mainCanvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(drawing){finishDrawing();return;}
+  if(currentMode==='draw' && drawTool==='select'){
+    const p = clientToMm(e);
+    const hp = hitPoint(p);
+    if(hp) {
+       const s = shapes.find(x => x.id === hp.shapeId);
+         if(s && s.type === 'spline') {
+            const p = s.points[hp.ptIdx];
+                        const isSym = p.mode === 'sym';
+            const isSmooth = p.mode === 'smooth';
+                        showContextMenu(e, [
+              {
+                label: 'Smooth 모드',
+                action: () => {
+                  p.mode = 'smooth';
+                  const lenIn = Math.hypot(p.inT.x, p.inT.y);
+                  const lenOut = Math.hypot(p.outT.x, p.outT.y) || 1e-5;
+                  if (lenIn > 0) p.inT = {x: -p.outT.x * lenIn / lenOut, y: -p.outT.y * lenIn / lenOut};
+                  render();
+                }
+              },
+              {
+                label: 'Symmetric 모드',
+                action: () => {
+                  p.mode = 'sym';
+                  p.inT = {x: -p.outT.x, y: -p.outT.y};
+                  render();
+                }
+              },
+              {
+                label: 'Cusp 모드',
+                action: () => {
+                  p.mode = 'cusp';
+                  render();
+                }
+              },
+              {
+                label: '자동 모드 재설정',
+                action: () => {
+                  p.manual = false;
+                  updateHermiteTangents(s);
+                  render();
+                }
+              },
+              {
+                label: '점 삭제',
+                action: () => {
+                  s.points.splice(hp.ptIdx, 1);
+                  if(s.points.length<2) {
+                    shapes=shapes.filter(x=>x.id!==s.id);
+                  }
+                  selPtIdx=null; render();
+                }
+              }
+            ]);
+            return;
+          }
+    }
+    const hs = hitSegment(p);
+    if(hs && hs.type === 'spline'){
+       showContextMenu(e, [
+         {
+           label: '점 추가',
+           action: () => {
+             const closed = isShapeClosed(hs);
+             const n = hs.points.length;
+             const segs = closed ? n : n - 1;
+             const g = hs.groupId ? groups.find(x=>x.id===hs.groupId) : null;
+             const pLocal = g ? rotAround(p, circle.cx, circle.cy, -g.rotation) : p;
+             let bestSeg = null; let minD = Infinity; let bestT = 0;
+             for(let i=0; i<segs; i++) {
+               const p0 = hs.points[i];
+               const p1 = hs.points[(i+1)%n];
+               const cp0 = { x: p0.x + p0.outT.x, y: p0.y + p0.outT.y };
+               const cp1 = { x: p1.x + p1.inT.x, y: p1.y + p1.inT.y };
+               for(let t=0; t<=1; t+=0.02) {
+                 const u=1-t, x=u*u*u*p0.x+3*u*u*t*cp0.x+3*u*t*t*cp1.x+t*t*t*p1.x;
+                 const y=u*u*u*p0.y+3*u*u*t*cp0.y+3*u*t*t*cp1.y+t*t*t*p1.y;
+                 const d = Math.hypot(pLocal.x-x, pLocal.y-y);
+                 if(d < minD){ minD = d; bestSeg = i; bestT = t; }
+               }
+             }
+              if(bestSeg !== null) {
+                const i = bestSeg;
+                const p0 = hs.points[i], p1 = hs.points[(i+1)%n];
+                const cp0 = { x: p0.x + p0.outT.x, y: p0.y + p0.outT.y };
+                const cp1 = { x: p1.x + p1.inT.x, y: p1.y + p1.inT.y };
+                const u = 1 - bestT;
+                const nx = u*u*u*p0.x + 3*u*u*bestT*cp0.x + 3*u*bestT*bestT*cp1.x + bestT*bestT*bestT*p1.x;
+                const ny = u*u*u*p0.y + 3*u*u*bestT*cp0.y + 3*u*bestT*bestT*cp1.y + bestT*bestT*bestT*p1.y;
+                const split = splitBezier(p0, cp0, cp1, p1, bestT);
+                const pt = split.left[3];
+                const newPt = {
+                  x: pt.x,
+                  y: pt.y,
+                  inT: { x: split.left[2].x - pt.x, y: split.left[2].y - pt.y },
+                  outT: { x: split.right[1].x - pt.x, y: split.right[1].y - pt.y },
+                  mode: 'smooth',
+                  manual: true
+                };
+                
+                p0.outT = { x: split.left[1].x - p0.x, y: split.left[1].y - p0.y };
+                p1.inT = { x: split.right[2].x - p1.x, y: split.right[2].y - p1.y };
+                
+                if (p0.mode === 'sym') p0.mode = 'smooth';
+                if (p1.mode === 'sym') p1.mode = 'smooth';
+                
+                hs.points.splice(i+1, 0, newPt);
+                render();
+              }
+           }
+         }
+       ]);
+       return;
+    }
+  }
+});
+
+function loadAutosave() {
+  try {
+    const saved = localStorage.getItem('rotadraw_autosave');
+    if (saved) {
+      const d = JSON.parse(saved);
+      if (d && (d.shapes || d.groups)) {
+        canvasW=d.canvasW||200;canvasH=d.canvasH||200;baseW=d.baseW||canvasW;baseH=d.baseH||canvasH;
+        paperGuide.w = canvasW;
+        paperGuide.h = canvasH;
+        paperGuide.cx = canvasW / 2;
+        paperGuide.cy = canvasH / 2;
+        paperGuide.rotation = 0;
+        circle=d.circle||{cx:100,cy:100,r:75};
+        shapes=d.shapes||[];nextShapeId=shapes.reduce((m,s)=>Math.max(m,s.id+1),1);
+        groups=d.groups||[];
+        let g1 = groups.find(g => g.id === GROUP1_ID);
+        if (!g1) {
+          groups.unshift({id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true});
+        } else {
+          g1.rotation = 0;
+          g1.locked = true;
+        }
+        nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
+        labels=d.labels||{};strokeWidth=d.strokeWidth||1;
+        
+        document.getElementById('cv-w').value=canvasW;
+        document.getElementById('cv-h').value=canvasH;
+        document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
+        document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
+        document.getElementById('sw-num').value=strokeWidth.toFixed(2);
+        document.getElementById('sw-range').value=strokeWidth;
+        
+        refreshGroupList();
+        setCanvasSize();
+        console.log('Autosave loaded successfully.');
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load autosave:', err);
+  }
+  return false;
+}
 </script>
 </body>
 </html>

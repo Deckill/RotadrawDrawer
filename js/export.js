@@ -1,33 +1,119 @@
-function saveProject(){
+async function saveProject(){
   const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.rdraw';a.click();
+  const jsonStr = JSON.stringify(data, null, 2);
+  
+  if (window.showSaveFilePicker && currentFileHandle) {
+    try {
+      const options = { mode: 'readwrite' };
+      if ((await currentFileHandle.queryPermission(options)) !== 'granted') {
+        if ((await currentFileHandle.requestPermission(options)) !== 'granted') {
+          alert('저장 권한이 거부되었습니다.');
+          return;
+        }
+      }
+      const writable = await currentFileHandle.createWritable();
+      await writable.write(jsonStr);
+      await writable.close();
+    } catch (err) {
+      console.warn('기존 파일 덮어쓰기 실패, 다른 이름으로 저장을 시도합니다.', err);
+      await saveProjectAs();
+    }
+  } else {
+    await saveProjectAs();
+  }
 }
 
-function loadProject(){document.getElementById('proj-input').click();}
+async function saveProjectAs(){
+  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
+  const jsonStr = JSON.stringify(data, null, 2);
+  
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'rotadraw.rdraw',
+        types: [{
+          description: 'Rotadraw Project',
+          accept: {
+            'application/json': ['.rdraw', '.json']
+          }
+        }]
+      });
+      currentFileHandle = handle;
+      const writable = await handle.createWritable();
+      await writable.write(jsonStr);
+      await writable.close();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert('저장 오류: ' + err.message);
+      }
+    }
+  } else {
+    const blob=new Blob([jsonStr],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.rdraw';a.click();
+  }
+}
+
+function applyProjectData(d){
+  canvasW=d.canvasW||200;canvasH=d.canvasH||200;baseW=d.baseW||canvasW;baseH=d.baseH||canvasH;
+  paperGuide.w = canvasW;
+  paperGuide.h = canvasH;
+  paperGuide.cx = canvasW / 2;
+  paperGuide.cy = canvasH / 2;
+  paperGuide.rotation = 0;
+  circle=d.circle||{cx:100,cy:100,r:75};
+  shapes=d.shapes||[];nextShapeId=shapes.reduce((m,s)=>Math.max(m,s.id+1),1);
+  groups=d.groups||[];
+  let g1 = groups.find(g => g.id === GROUP1_ID);
+  if (!g1) {
+    groups.unshift({id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true});
+  } else {
+    g1.rotation = 0;
+    g1.locked = true;
+  }
+  nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
+  labels=d.labels||{};strokeWidth=d.strokeWidth||1;activeDrawGroupId=groups.find(g=>g.id===GROUP1_ID)?.id || groups[0].id;
+  document.getElementById('cv-w').value=canvasW;document.getElementById('cv-h').value=canvasH;
+  document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
+  document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
+  document.getElementById('sw-num').value=strokeWidth.toFixed(2);document.getElementById('sw-range').value=strokeWidth;
+  refreshGroupList();setCanvasSize();render();
+  triggerAutosave();
+}
+
+async function loadProject(){
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'Rotadraw Project',
+          accept: {
+            'application/json': ['.rdraw', '.json']
+          }
+        }]
+      });
+      currentFileHandle = handle;
+      const file = await handle.getFile();
+      const text = await file.text();
+      const d = JSON.parse(text);
+      applyProjectData(d);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert('불러오기 오류: ' + err.message);
+      }
+    }
+  } else {
+    document.getElementById('proj-input').click();
+  }
+}
 
 function onProjectLoaded(e){
   const file=e.target.files[0];if(!file)return;
+  currentFileHandle = null;
   const rd=new FileReader();
   rd.onload=ev=>{
     try{
       const d=JSON.parse(ev.target.result);
-      canvasW=d.canvasW||200;canvasH=d.canvasH||200;baseW=d.baseW||canvasW;baseH=d.baseH||canvasH;
-      paperGuide.w = canvasW;
-      paperGuide.h = canvasH;
-      paperGuide.cx = canvasW / 2;
-      paperGuide.cy = canvasH / 2;
-      paperGuide.rotation = 0;
-      circle=d.circle||{cx:100,cy:100,r:75};
-      shapes=d.shapes||[];nextShapeId=shapes.reduce((m,s)=>Math.max(m,s.id+1),1);
-      groups=d.groups||[];nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
-      if(!groups.length)initDefaultGroup();
-      labels=d.labels||{};strokeWidth=d.strokeWidth||1;activeDrawGroupId=groups[0].id;
-      document.getElementById('cv-w').value=canvasW;document.getElementById('cv-h').value=canvasH;
-      document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
-      document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
-      document.getElementById('sw-num').value=strokeWidth.toFixed(2);document.getElementById('sw-range').value=strokeWidth;
-      syncAspectSlider();refreshGroupList();setCanvasSize();render();
+      applyProjectData(d);
     }catch(err){alert('파일 오류: '+err.message);}
   };
   rd.readAsText(file);e.target.value='';
@@ -56,10 +142,64 @@ function renderOffscreen(mmScale){
     const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
     oc2.save();
     if(g&&g.rotation!==0){oc2.translate(circle.cx*mmScale,circle.cy*mmScale);oc2.rotate(g.rotation*Math.PI/180);oc2.translate(-circle.cx*mmScale,-circle.cy*mmScale);}
-    const path=getShapePath(s,mmScale);
-    if(path){oc2.fillStyle=g?g.color:'#000';oc2.fill(path,'evenodd');}
+    
+    const color = g ? g.color : '#000';
+    const {pts, closed} = getPolyline(s);
+    if(pts.length>=2){
+      oc2.beginPath();
+      oc2.moveTo(pts[0].x * mmScale, pts[0].y * mmScale);
+      pts.slice(1).forEach(p => oc2.lineTo(p.x * mmScale, p.y * mmScale));
+      oc2.lineJoin = 'miter';
+      oc2.lineCap = 'round';
+      if(closed){
+        oc2.closePath();
+        oc2.fillStyle = color;
+        oc2.fill();
+        oc2.strokeStyle = color;
+        oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+        oc2.stroke();
+      } else {
+        oc2.strokeStyle = color;
+        oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+        oc2.stroke();
+      }
+    }
     oc2.restore();
   });
+  
+  // 가이드 원 오프스크린 렌더링 추가
+  const circleCx = circle.cx * mmScale, circleCy = circle.cy * mmScale, circleR = circle.r * mmScale;
+  oc2.save();
+  oc2.strokeStyle = '#4488ffaa'; oc2.lineWidth = 0.5 * mmScale;
+  oc2.setLineDash([5 * mmScale, 5 * mmScale]);
+  oc2.beginPath(); oc2.arc(circleCx, circleCy, circleR, 0, Math.PI*2); oc2.stroke();
+  oc2.setLineDash([]);
+  oc2.fillStyle = '#4488ffcc'; oc2.beginPath(); oc2.arc(circleCx, circleCy, 2.5 * mmScale, 0, Math.PI*2); oc2.fill();
+  oc2.restore();
+  
+  // 그룹 마커 핸들 오프스크린 렌더링 추가
+  groups.forEach(g => {
+    const mRadHalf = 3 * mmScale;
+    const mTangHalf = 0.5 * mmScale;
+    oc2.save();
+    oc2.translate(circle.cx * mmScale, circle.cy * mmScale);
+    oc2.rotate(g.rotation * Math.PI / 180);
+    const edgeY = -(circle.r * mmScale);
+    oc2.fillStyle = g.color + 'bb';
+    oc2.strokeStyle = g.color;
+    oc2.lineWidth = 1 * mmScale;
+    oc2.beginPath();
+    oc2.rect(-mTangHalf, edgeY - mRadHalf, mTangHalf * 2, mRadHalf * 2);
+    oc2.fill(); oc2.stroke();
+    
+    // Label to the right
+    oc2.fillStyle = '#fff';
+    oc2.font = `bold ${3.5 * mmScale}px sans-serif`;
+    oc2.textAlign = 'left'; oc2.textBaseline = 'middle';
+    oc2.fillText(g.label, mTangHalf + 4 * mmScale, edgeY);
+    oc2.restore();
+  });
+
   oc2.restore();
   return oc;
 }
@@ -69,6 +209,9 @@ function exportPNG(){document.getElementById('export-modal').style.display='none
 function getGlobalBounds() {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const addPt = (x, y) => { minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); };
+  // Include guide circle bounds
+  addPt(circle.cx - circle.r, circle.cy - circle.r);
+  addPt(circle.cx + circle.r, circle.cy + circle.r);
   shapes.forEach(s => {
      if(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))return;
      const g = s.groupId ? groups.find(x=>x.id===s.groupId) : null;
@@ -86,7 +229,7 @@ function getGlobalBounds() {
      addPt(tl.x, tl.y); addPt(tr.x, tr.y); addPt(br.x, br.y); addPt(bl.x, bl.y);
   });
   if (minX === Infinity) return {x:0, y:0, w:100, h:100};
-  minX -= 10; minY -= 10; maxX += 10; maxY += 10;
+  minX -= 5; minY -= 5; maxX += 5; maxY += 5;
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
@@ -101,10 +244,32 @@ function exportSVG(){
   groups.forEach(g=>{
     svg+=`<g transform="rotate(${g.rotation},${circle.cx},${circle.cy})">\n`;
     shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
-      const d=svgPathD(s);if(d)svg+=`  <path d="${d}" fill="${g.color}" fill-rule="evenodd"/>\n`;
+      const d=svgPathD(s);
+      if(d){
+        const sw = s.strokeWidth || strokeWidth;
+        if(s.closed){
+          svg+=`  <path d="${d}" fill="${g.color}" stroke="${g.color}" stroke-width="${sw}" stroke-linejoin="miter" />\n`;
+        } else {
+          svg+=`  <path d="${d}" fill="none" stroke="${g.color}" stroke-width="${sw}" stroke-linejoin="miter" stroke-linecap="round" />\n`;
+        }
+      }
     });
     svg+=`</g>\n`;
   });
+  
+  // 가이드 원 SVG 추가 (중심 원 실선)
+  svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="${circle.r.toFixed(2)}" stroke="#4488ff" stroke-opacity="0.67" stroke-width="0.5" stroke-dasharray="5,5" fill="none" />\n`;
+  svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="2.5" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="0.4" />\n`;
+  
+  // 그룹 마커 핸들 SVG 추가
+  groups.forEach(g => {
+    const edgeY = -circle.r;
+    svg += `  <g transform="rotate(${g.rotation}, ${circle.cx}, ${circle.cy})">\n`;
+    svg += `    <rect x="-0.5" y="${(edgeY - 3).toFixed(2)}" width="1" height="6" fill="${g.color}" fill-opacity="0.73" stroke="${g.color}" stroke-width="0.5" />\n`;
+    svg += `    <text x="4.5" y="${edgeY.toFixed(2)}" fill="#ffffff" font-family="sans-serif" font-weight="bold" font-size="3.5" dominant-baseline="middle" text-anchor="start">${g.label}</text>\n`;
+    svg += `  </g>\n`;
+  });
+
   svg+='</svg>';
   const blob=new Blob([svg],{type:'image/svg+xml'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.svg';a.click();
@@ -120,8 +285,8 @@ function svgPathD(s) {
     let d = `M ${rawPts[0].x.toFixed(2)} ${rawPts[0].y.toFixed(2)} `;
     for (let i = 0; i < segs; i++) {
       const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
-      const c0 = {x: p0.x + (p0.outT.x)/3, y: p0.y + (p0.outT.y)/3};
-      const c1 = {x: p1.x + (p1.inT.x)/3, y: p1.y + (p1.inT.y)/3};
+      const c0 = {x: p0.x + p0.outT.x, y: p0.y + p0.outT.y};
+      const c1 = {x: p1.x + p1.inT.x, y: p1.y + p1.inT.y};
       d += `C ${c0.x.toFixed(2)} ${c0.y.toFixed(2)}, ${c1.x.toFixed(2)} ${c1.y.toFixed(2)}, ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} `;
     }
     if (closed) d += 'Z';

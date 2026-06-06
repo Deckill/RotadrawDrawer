@@ -9,8 +9,8 @@ function getPolyline(s) {
   const steps = 20;
   for (let i = 0; i < segs; i++) {
     const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
-    const c0 = {x: p0.x + (p0.outT.x)/3, y: p0.y + (p0.outT.y)/3};
-    const c1 = {x: p1.x + (p1.inT.x)/3, y: p1.y + (p1.inT.y)/3};
+    const c0 = {x: p0.x + p0.outT.x, y: p0.y + p0.outT.y};
+    const c1 = {x: p1.x + p1.inT.x, y: p1.y + p1.inT.y};
     for (let j = 0; j < steps; j++) {
       const t = j / steps;
       const u = 1 - t;
@@ -101,10 +101,12 @@ function miterJoin(bL_prev, dirPrev, bL_next, dirNext, halfW, maxMiter=4){
 }
 
 function hitPoint(pos){
-  const thresh=Math.max(2.5,6/viewScale);
+  // 픽셀 기준 반경: 줌 수준에 관계없이 항상 10px
+  const thresh = 10 / (MM * viewScale);
   for(let i=shapes.length-1;i>=0;i--){
     const s=shapes[i];
-  // ── Draw mode ──
+    // Draw 모드에서는 copy 선택 불가
+    if(currentMode==='draw' && s._isCopy) continue;
     const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
     const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
     for(let j=0;j<s.points.length;j++){
@@ -115,14 +117,33 @@ function hitPoint(pos){
   return null;
 }
 
+function isPointInPolygon(p, s) {
+  const {pts} = getPolyline(s);
+  const n = pts.length;
+  if (n < 3) return false;
+  let inside = false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y;
+    const xj = pts[j].x, yj = pts[j].y;
+    const intersect = ((yi > p.y) !== (yj > p.y))
+        && (p.x < (xj - xi) * (p.y - yi) / (yj - yi + 1e-10) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 function hitSegment(pos){
   const thresh=Math.max(1.5,4/viewScale);
   for(let i=shapes.length-1;i>=0;i--){
     const s=shapes[i];
-  // ── Draw mode ──
+    // Draw 모드에서는 copy 선택 불가
+    if(currentMode==='draw' && s._isCopy) continue;
     if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
     const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
     const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    if (isShapeClosed(s)) {
+      if (isPointInPolygon(pLocal, s)) return s;
+    }
     const{pts}=getPolyline(s);
     for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
     if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
@@ -137,8 +158,9 @@ function hitHandle(pos,s,ptIdx,side){
   const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
   const h=side==='out'?outH:inH;
   if(!h)return false;
-  const dx=pLocal.x-h.x,dy=pLocal.y-h.y;
-  return dx*dx+dy*dy<25; // 5mm radius
+  // 픽셀 기준 반경 (점 10px보다 작아 점 우선순위 자연 보장)
+  const thresh = 7 / (MM * viewScale);
+  return Math.hypot(pLocal.x-h.x,pLocal.y-h.y)<thresh;
 }
 
 function hitGroupMarker(pos,g){
@@ -151,6 +173,9 @@ function hitGroupMarker(pos,g){
 function distToShape(pos,s){
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
   const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+  if (isShapeClosed(s) && isPointInPolygon(pLocal, s)) {
+    return 0;
+  }
   const{pts}=getPolyline(s);
   let md=Infinity;
   for(let j=0;j<pts.length-1;j++)md=Math.min(md,segDist(pLocal,pts[j],pts[j+1]));
@@ -215,9 +240,26 @@ function hitTestCanvasObj(obj, pos) {
   return Math.abs(lx) <= obj.w/2 && Math.abs(ly) <= obj.h/2;
 }
 
+function getShapesBounds() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  shapes.forEach(s => {
+    const g = s.groupId ? groups.find(x => x.id === s.groupId) : null;
+    const {pts} = getPolyline(s);
+    pts.forEach(p => {
+      const w = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
+      minX = Math.min(minX, w.x);
+      minY = Math.min(minY, w.y);
+      maxX = Math.max(maxX, w.x);
+      maxY = Math.max(maxY, w.y);
+    });
+  });
+  if (minX === Infinity) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
 function getCanvasModeTarget(pos) {
   const hitR = Math.max(4, 8/viewScale);
-  // 1. Check active object handles (only images, paper guide is locked)
+  // 1. Check active object handles
   if (canvSelType === 'image') {
     const activeObj = images.find(x => x.id === canvSelId);
     if (activeObj) {
@@ -228,11 +270,31 @@ function getCanvasModeTarget(pos) {
         }
       }
     }
+  } else if (canvSelType === 'shapes' && shapesTransform) {
+    const handles = getTransformHandles(shapesTransform);
+    for (let k in handles) {
+      if (Math.hypot(pos.x - handles[k].x, pos.y - handles[k].y) < hitR) {
+        return { type: 'shapes', id: null, handle: k };
+      }
+    }
   }
   // 1.5. Check circle center or border
   const distToCircleCenter = Math.hypot(pos.x - circle.cx, pos.y - circle.cy);
   if (distToCircleCenter < Math.max(6, 12/viewScale) || Math.abs(distToCircleCenter - circle.r) < Math.max(3, 6/viewScale)) {
     return { type: 'circle', id: null, handle: 'center' };
+  }
+  // 1.8. Check shapes (vector lines)
+  const hitShape = hitSegment(pos);
+  if (hitShape) {
+    const bounds = getShapesBounds();
+    if (bounds) {
+      shapesTransform.cx = bounds.x + bounds.w/2;
+      shapesTransform.cy = bounds.y + bounds.h/2;
+      shapesTransform.w = bounds.w;
+      shapesTransform.h = bounds.h;
+      shapesTransform.rotation = 0;
+      return { type: 'shapes', id: null, handle: 'center' };
+    }
   }
   // 2. Check images (front to back)
   for (let i = images.length - 1; i >= 0; i--) {
@@ -247,5 +309,13 @@ function updateHermiteTangents(s) {
   const pts = s.points;
   const n = pts.length;
   if (n < 2) return;
-  solveNaturalCubicSpline(pts, s.closed);
+  
+  if (typeof currentSplineAlgo !== 'undefined') {
+    if (currentSplineAlgo === 'natural') solveNaturalCubicSpline(pts, s.closed);
+    else if (currentSplineAlgo === 'catmull') solveCatmullRomSpline(pts, s.closed, 0.5);
+    else if (currentSplineAlgo === 'bspline') solveGlobalBSpline(pts, s.closed);
+    else solveNaturalCubicSpline(pts, s.closed);
+  } else {
+    solveNaturalCubicSpline(pts, s.closed);
+  }
 }

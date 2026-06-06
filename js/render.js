@@ -1,10 +1,17 @@
 function render(){
   const W=mainCanvas.width,H=mainCanvas.height,sc=MM*viewScale;
+  // 뷰포트 전체 클리어
   bgCtx.clearRect(0,0,W,H);
-  bgCtx.fillStyle=document.getElementById('cv-bg').value;
-  bgCtx.fillRect(0,0,W,H);
-  if(bgImage)bgCtx.drawImage(bgImage,0,0,W,H);
   ctx.clearRect(0,0,W,H);
+  // pan/zoom 트랜스폼 적용 (캔버스는 뷰포트 고정 크기, 오프셋으로 이동)
+  bgCtx.save();
+  bgCtx.translate(viewOffX,viewOffY);
+  ctx.save();
+  ctx.translate(viewOffX,viewOffY);
+  // 용지 영역에만 배경색 채우기
+  bgCtx.fillStyle=document.getElementById('cv-bg').value;
+  bgCtx.fillRect(0,0,canvasW*sc,canvasH*sc);
+  if(bgImage)bgCtx.drawImage(bgImage,0,0,canvasW*sc,canvasH*sc);
   renderCanvasMode(sc);
   shapes.forEach(s=>renderShape(s,sc));
   if(drawing&&drawingShape)renderShape(drawingShape,sc,true);
@@ -12,6 +19,10 @@ function render(){
   if(currentMode==='arrange'||currentMode==='label')renderGroupMarkers(sc);
   if(currentMode==='label')renderLabels(sc);
   if(currentMode==='draw'&&drawTool==='select'&&selShapeId!==null&&selPtIdx!==null)renderBezierHandles(sc);
+  if(typeof updateImageSizeUI === 'function') updateImageSizeUI();
+  // 트랜스폼 복구
+  bgCtx.restore();
+  ctx.restore();
 }
 
 function renderShape(s,sc,isPreview=false,customCtx=null){
@@ -19,33 +30,62 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
   const color=gColor(s);
   const isGhost=(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id));
+  const isCopyInDrawMode=(currentMode==='draw'&&s._isCopy);
+  // draw 모드에서 isGhost는 무시 (원본을 진하게 보이게)
+  const applyGhost = isGhost && currentMode !== 'draw';
+  const shapeOpacity = (s.opacity !== undefined ? s.opacity : 1.0);
   drawCtx.save();
   if(g&&g.rotation!==0){
     drawCtx.translate(circle.cx*sc,circle.cy*sc);
     drawCtx.rotate(g.rotation*Math.PI/180);
     drawCtx.translate(-circle.cx*sc,-circle.cy*sc);
   }
-  drawCtx.globalAlpha=isPreview?0.55:isGhost?0.15:1;
-  const path=getShapePath(s,sc);
-  if(path){
-    drawCtx.fillStyle=color;
-    drawCtx.fill(path,'evenodd');
-  }
-  // Arrange highlight
-  if(currentMode==='arrange'&&s.id===arrSelShapeId&&path&&!customCtx){
-    drawCtx.globalAlpha=0.3;drawCtx.fillStyle='#fff';drawCtx.fill(path,'evenodd');
-    drawCtx.globalAlpha=0.9;drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1.5;
-    const{pts,closed}=getPolyline(s);
-    if(pts.length>=2){
-      drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-      if(closed)drawCtx.closePath();
+  const baseAlpha = isPreview?0.55 : applyGhost?0.15 : isCopyInDrawMode?0.22 : 1.0;
+  drawCtx.globalAlpha = baseAlpha * shapeOpacity;
+  
+  const{pts,closed}=getPolyline(s);
+  if(pts.length>=2){
+    drawCtx.beginPath();
+    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    drawCtx.lineJoin = 'miter';
+    drawCtx.lineCap = 'round';
+    if(closed){
+      drawCtx.closePath();
+      drawCtx.fillStyle=color;
+      drawCtx.fill();
+      drawCtx.strokeStyle=color;
+      drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.stroke();
+    } else {
+      drawCtx.strokeStyle=color;
+      drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
       drawCtx.stroke();
     }
   }
+
+  // Arrange highlight
+  if(currentMode==='arrange'&&s.id===arrSelShapeId&&pts.length>=2&&!customCtx){
+    drawCtx.save();
+    drawCtx.globalAlpha=0.3;
+    drawCtx.beginPath();
+    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    if(closed){
+      drawCtx.closePath();
+      drawCtx.fillStyle='#fff';
+      drawCtx.fill();
+    }
+    drawCtx.restore();
+    
+    drawCtx.globalAlpha=0.9;drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1.5;
+    drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    if(closed)drawCtx.closePath();
+    drawCtx.stroke();
+  }
   // Draw mode vertex/edge drawing
   if(currentMode==='draw'&&s.id===selShapeId&&!customCtx){
-    const{pts,closed}=getPolyline(s);
     if(pts.length>=2){
       drawCtx.strokeStyle='#4488ffaa';drawCtx.lineWidth=1;
       drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
@@ -81,6 +121,7 @@ function renderCircle(sc){
 function renderCanvasMode(sc) {
   images.forEach(img => {
      ctx.save();
+     ctx.globalAlpha = (img.opacity !== undefined ? img.opacity : 1.0);
      ctx.translate(img.cx*sc, img.cy*sc);
      ctx.rotate(img.rotation * Math.PI / 180);
      ctx.drawImage(img.img, -img.w/2*sc, -img.h/2*sc, img.w*sc, img.h*sc);
@@ -104,7 +145,7 @@ function renderCanvasMode(sc) {
     ctx.restore();
   }
   if (currentMode === 'canvas') {
-     const activeObj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'image' ? images.find(x => x.id === canvSelId) : null);
+     const activeObj = canvSelType === 'paper' ? paperGuide : (canvSelType === 'image' ? images.find(x => x.id === canvSelId) : (canvSelType === 'shapes' ? shapesTransform : null));
      if (activeObj) {
         const rad = activeObj.rotation * Math.PI / 180;
         const cos = Math.cos(rad), sin = Math.sin(rad);
