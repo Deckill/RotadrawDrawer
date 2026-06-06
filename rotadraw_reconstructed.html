@@ -1,0 +1,1978 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Rotadraw Designer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+#topbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #16213e; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
+#topbar h1 { font-size: 16px; font-weight: 700; color: #e94560; margin-right: 8px; letter-spacing: 1px; }
+.tb-sep { width: 1px; height: 24px; background: #0f3460; margin: 0 4px; }
+.tb-btn { padding: 4px 10px; background: #0f3460; border: 1px solid #1a4a7a; border-radius: 4px; color: #ccc; font-size: 12px; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.tb-btn:hover { background: #1a5a9a; color: #fff; }
+.tb-btn.active { background: #e94560; border-color: #e94560; color: #fff; }
+#tb-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+#main { display: flex; flex: 1; overflow: hidden; }
+#left-panel { width: 230px; background: #16213e; border-right: 1px solid #0f3460; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.panel-section { padding: 10px; border-bottom: 1px solid #0f3460; }
+.panel-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    for(let y = oy; y < H; y += gridSize) { bgCtx.moveTo(0, y); bgCtx.lineTo(W, y); }
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+}
+'''
+    html = html.replace('function render(){', grid_func + 'function render(){')
+
+# Call renderGrid inside render()
+render_body = '''    bgCtx.fillRect(0,0,W,H);
+    ctx.clearRect(0,0,W,H);
+    
+    renderGrid(sc);
+    renderCanvasMode(sc);'''
+
+if 'renderGrid(sc)' not in html:
+    html = html.replace('    bgCtx.fillRect(0,0,W,H);\n    ctx.clearRect(0,0,W,H);\n    \n    renderCanvasMode(sc);', render_body)
+
+with open('rotadraw.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+
+                        # Single line comment, ignore rest of line
+                        break
+                    elif char == '/' 
+with open('rotadraw.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+
+text = text.replace(old_offscreen, new_offscreen)
+                # Handle strings
+                if in_string:
+                    if char == '\\':
+                        j += 2 # Skip escaped char
+                        continue
+                    if char == string_char:
+                        in_string = False
+                    j += 1
+                    continue
+                else:
+                    if char in ('"', "'", '`'):
+                        in_string = True
+                        string_char = char
+                        j += 1
+                        continue
+                
+                # Check brackets
+                if char in ('(', '{', '['):
+                    stack.append((char, i, j + 1))
+                elif char in (')', '}', ']'):
+                    if not stack:
+                        errors.append(f"Line {i}, Col {j+1}: Unmatched closing bracket '{char}'")
+                    else:
+                        top, line_num, col_num = stack.pop()
+                        if top != mapping[char]:
+                            errors.append(f"Line {i}, Col {j+1}: Mismatched bracket. Found '{char}' closing '{top}' from line {line_num}, col {col_num}")
+                j += 1
+                
+        # Check for unclosed brackets
+        while stack:
+            top, line_num, col_num = stack.pop()
+            errors.append(f"Unclosed open bracket '{top}' at line {line_num}, col {col_num}")
+            
+        if errors:
+            print(f"Found {len(errors)} potential bracket issues:")
+            for err in errors[:20]:
+                print("  ", err)
+        else:
+            print("Brackets and parentheses balance check passed!")
+            
+    else:
+        print("Could not find <script> tag in HTML file.")
+else:
+    print("HTML file not found.")
+
+        if \'getShapePath\' in line:\
+            print(f\'{i}: {line.strip()}\')\
+\\""', 'Cwd': '"f:/UnityProject/로타드로"', 'WaitMsBeforeAsync': '3000', 'toolAction': '"Searching for getShapePath in html"', 'toolSummary': '"Command execution"'}}]} ...
+--------------------------------------------------------------------------------
+Step 700: ... e:\
+            print(f\'{i}: {line.strip()}\')\
+\\""', 'Cwd': '"f:/UnityProject/로타드로"', 'WaitMsBeforeAsync': '3000', 'toolAction': '"Searching for getShapePath in html"', 'toolSummary': '"Command execution"'}}]} ...
+--------------------------------------------------------------------------------
+    f.write(html)
+
+                 if(p.mode === 'sym') p.inT = {x: -p.outT.x, y: -p.outT.y};
+                 render();
+               }
+             },
+             {
+               label: '점 삭제',
+        };
+        
+        ctx.strokeStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
+        ctx.fillStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        const r = 4;
+        
+        ctx.beginPath();
+        ctx.moveTo(handles.tl.x, handles.tl.y);
+        ctx.lineTo(handles.tr.x, handles.tr.y);
+        ctx.lineTo(handles.br.x, handles.br.y);
+        ctx.lineTo(handles.bl.x, handles.bl.y);
+        ctx.closePath();
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(handles.t.x, handles.t.y);
+        ctx.lineTo(handles.rotH.x, handles.rotH.y);
+        ctx.stroke();
+        
+        for(let k in handles) {
+           ctx.beginPath();
+           if(k === 'rotH') ctx.arc(handles[k].x, handles[k].y, r, 0, Math.PI*2);
+           else ctx.rect(handles[k].x - r, handles[k].y - r, r*2, r*2);
+           ctx.fill(); ctx.stroke();
+        }
+     }
+  }
+}
+
+function render(){
+    const W=mainCanvas.width,H=mainCanvas.height,sc=MM*viewScale;
+    bgCtx.clearRect(0,0,W,H);
+    bgCtx.fillStyle=document.getElementById('cv-bg').value;
+    bgCtx.fillRect(0,0,W,H);
+    ctx.clearRect(0,0,W,H);
+    
+    renderCanvasMode(sc);
+    
+    shapes.forEach(s=>renderShape(s,sc));
+    if(drawing&&drawingShape)renderShape(drawingShape,sc,true);
+    renderCircle(sc);
+    if(currentMode==='arrange'||currentMode==='label')renderGroupMarkers(sc);
+    if(currentMode==='label')renderLabels(sc);
+    if(currentMode==='draw'&&drawTool==='select'&&selShapeId!==null&&selPtIdx!==null)renderBezierHandles(sc);
+  }'''
+text = text.replace(old_render, new_render)
+
+with open('rotadraw.html', 'w', encoding='utf-8') as f:
+    f.write(text)
+
+print("Patch 3 done.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let canvasW = 210, canvasH = 297, baseW = 210, baseH = 297;
+let circle  = { cx: 100, cy: 100, r: 75 };
+let images = [];
+let bgImage = null;
+let nextImgId = 1;
+let paperGuide = { cx: 100, cy: 100, w: 210, h: 297, rotation: 0, visible: true, size: 'A4' };
+let canvDragState = null;
+let canvSelId = null; // for image
+  let canvSelHandle = null;
+let currentMode = 'canvas';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function setCanvasSize() {
+  const pw = Math.max(1, Math.round(canvasW*MM*viewScale));
+  const ph = Math.max(1, Math.round(canvasH*MM*viewScale));
+  bgCanvas.width  = mainCanvas.width  = pw;
+  bgCanvas.height = mainCanvas.height = ph;
+  bgCanvas.style.width  = mainCanvas.style.width  = pw+'px';
+  bgCanvas.style.height = mainCanvas.style.height = ph+'px';
+  wrapper.style.width  = pw+'px';
+  wrapper.style.height = ph+'px';
+  wrapper.style.left   = viewOffX+'px';
+  wrapper.style.top    = viewOffY+'px';
+}
+
+canvasArea.addEventListener('wheel', e => {
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.1 : 0.9;
+  const ns = Math.max(0.08, Math.min(12, viewScale*f));
+  const ar = canvasArea.getBoundingClientRect();
+  const mx = e.clientX - ar.left, my = e.clientY - ar.top;
+  const ratio = ns/viewScale;
+  viewOffX = mx - (mx-viewOffX)*ratio;
+  viewOffY = my - (my-viewOffY)*ratio;
+  viewScale = ns;
+  setCanvasSize(); render();
+}, { passive:false });
+
+
+
+
+
+
+// ═══════════════════════════════════════════════
+//  CANVAS SIZE CONTROLS
+// ═══════════════════════════════════════════════
+function onPaperSizeChange(val) {
+  if (val === 'Custom') {
+    document.getElementById('cv-w').disabled = false;
+    document.getElementById('cv-h').disabled = false;
+  } else {
+    document.getElementById('cv-w').disabled = true;
+    document.getElementById('cv-h').disabled = true;
+    if (val === 'A4') { paperGuide.w = 210; paperGuide.h = 297; }
+    else if (val === 'A3') { paperGuide.w = 297; paperGuide.h = 420; }
+    else if (val === 'Letter') { paperGuide.w = 215.9; paperGuide.h = 279.4; }
+    document.getElementById('cv-w').value = paperGuide.w;
+    document.getElementById('cv-h').value = paperGuide.h;
+  }
+  paperGuide.size = val;
+  render();
+}
+function onCustomPaperWH(axis, val) {
+  const v = parseFloat(val);
+  if (!isNaN(v) && v > 0) {
+    if (axis === 'w') paperGuide.w = v;
+    if (axis === 'h') paperGuide.h = v;
+    render();
+  }
+}
+function goHome() {
+  const ar = canvasArea.getBoundingClientRect();
+  if (ar.width > 0 && ar.height > 0) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function refreshGroupList() {
+  // Arrange list
+  const list=document.getElementById('group-list');
+  list.innerHTML='';
+  groups.forEach(g=>{
+    const d=document.createElement('div');
+    d.className='group-item';
+    const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
+    d.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1">그룹 ${g.label}</span><input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">${delHtml}`;
+    list.appendChild(d);
+  });
+  // Label panel
+  const ll=document.getElementById('label-group-list');
+  ll.innerHTML='';
+  groups.forEach(g=>{
+    const row=document.createElement('div');
+    row.className='input-row';
+    row.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1;font-size:12px">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
+    ll.appendChild(row);
+  });
+}
+function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render();}}
+
+// ═══
+//  STROKE WIDTH
+// ═══════════════════════════════════════════════
+function onSwRange(v){strokeWidth=parseFloat(v);document.getElementById('sw-num').value=strokeWidth.toFixed(2);render();}
+function onSwNum(v){strokeWidth=Math.max(0.5,Math.min(2,parseFloat(v)||1));document.getElementById('sw-range').value=strokeWidth;render();}
+
+// ═══════════════════════════════════════════════
+    d.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1">그룹 ${g.label}</span><input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">${delHtml}`;
+    list.appendChild(d);
+  });
+  // Label panel
+  const ll=document.getElementById('label-group-list');
+  ll.innerHTML='';
+  groups.forEach(g=>{
+    const row=document.createElement('div');
+    row.className='input-row';
+    row.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1;font-size:12px">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
+    ll.appendChild(row);
+  });
+}
+function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render();}}
+
+// ═══════════════════════════════════════════════
+//  STROKE WIDTH
+// ═══════════════════════════════════════════════
+function onSwRange(v){strokeWidth=parseFloat(v);document.getElementById('sw-num').value=strokeWidth.toFixed(2);render();}
+function onSwNum(v){strokeWidth=Math.max(0.5,Math.min(2,parseFloat(v)||1));document.getElementById('sw-range').value=strokeWidth;render();}
+
+// ═══════════════════════════════════════════════
+//  MODES
+// ═══════════════════════════════════════════════
+const MODE_NAMES={canvas:'캔버스',draw:'그리기',arrange:'배치',label:'레이블'};
+
+function setMode(m){
+  if(drawing)finishDrawing();
+  currentMode=m;
+  ['canvas','draw','arrange','label'].forEach(mm=>{
+    document.getElementById('mode-'+mm).classList.toggle('active',mm===m);
+    const p=document.getElementById('panel-'+mm);if(p)p.style.display=mm===m?'':'none';
+  });
+  document.getElementById('sb-mode').textContent='모드: '+MODE_NAMES[m];
+  selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;
+  arrSelShapeId=null;arrDragState=null;hoverPtRef=null;lblDrag=null;
+//  HERMITE SPLINE SYSTEM
+// ==========================================
+function updateHermiteTangents(s) {
+  const pts = s.points;
+  const n = pts.length;
+
+
+
+
+
+
+
+
+
+function onImageFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => onImageObjectLoaded(img);
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+
+// ==========================================
+//  HERMITE SPLINE SYSTEM
+// ==========================================
+function updateHermiteTangents(s) {
+  const pts = s.points;
+  const n = pts.length;
+  if (n < 2) return;
+  const closed = s.closed;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    if (p.mode === 'free' && (p.inT.x!==0 || p.inT.y!==0 || p.outT.x!==0 || p.outT.y!==0)) continue; // Don't override user-edited free tangents
+    
+    let prev = closed ? pts[(i - 1 + n) % n] : pts[Math.max(0, i - 1)];
+    let next = closed ? pts[(i + 1) % n] : pts[Math.min(n - 1, i + 1)];
+    
+    // Catmull-Rom like tangent
+    let vx = (next.x - prev.x) / 2;
+    let vy = (next.y - prev.y) / 2;
+    
+    if (!closed) {
+      if (i === 0) { vx = (next.x - p.x); vy = (next.y - p.y); }
+      if (i === n - 1) { vx = (p.x - prev.x); vy = (p.y - prev.y); }
+    }
+    
+    if (p.mode === 'sym') {
+       p.outT = {x: vx, y: vy};
+       p.inT = {x: -vx, y: -vy};
+    }
+  }
+}
+
+function getPolyline(s) {
+  const closed = s.closed === true;
+  if (s.type === 'line') return {pts: s.points.map(p=>({x:p.x, y:p.y})), closed};
+  
+  const rawPts = s.points;
+  const rn = rawPts.length;
+  if (rn < 2) return {pts: rawPts.map(p=>({x:p.x, y:p.y})), closed};
+  const segs = closed ? rn : rn - 1;
+  
+  const pts = [];
+  const steps = 20;
+  for (let i = 0; i < segs; i++) {
+    const p0 = rawPts[i], p1 = rawPts[(i + 1) % rn];
+    const c0 = {x: p0.x + (p0.outT.x)/3, y: p0.y + (p0.outT.y)/3};
+    const c1 = {x: p1.x + (p1.inT.x)/3, y: p1.y + (p1.inT.y)/3};
+  const closed = s.closed === true;
+  const rawPts = s.points;
+  if (rawPts.length < 2) return null;
+  let d = M   ;
+  rawPts.slice(1).forEach(p => d += L   );
+  if (closed) d += 'Z';
+  return d;
+}
+
+function getCurvature(P0, M0, P1, M1, t) {
+  let Vx, Vy, Ax, Ay;
+  if (t === 0) {
+    Vx = M0.x; Vy = M0.y;
+    Ax = 6*(P1.x - P0.x) - 4*M0.x - 2*M1.x;
+    Ay = 6*(P1.y - P0.y) - 4*M0.y - 2*M1.y;
+  } else {
+    Vx = M1.x; Vy = M1.y;
+    Ax = -6*(P1.x - P0.x) + 2*M0.x + 4*M1.x;
+    Ay = -6*(P1.y - P0.y) + 2*M0.y + 4*M1.y;
+  }
+  const v2 = Vx*Vx + Vy*Vy;
+  if (v2 < 1e-5) return null;
+  const cross = Vx*Ay - Vy*Ax;
+  if (Math.abs(cross) < 1e-5) return null;
+  const k = cross / Math.pow(v2, 1.5);
+  let R = 1 / Math.abs(k);
+  if (R > 500) R = 500; // Limit to 500mm
+  
+  const vMag = Math.sqrt(v2);
+  const nx = -Vy / vMag;
+  const ny = Vx / vMag;
+  const cx = (t===0?P0.x:P1.x) + (1/k) * nx;
+  const cy = (t===0?P0.y:P1.y) + (1/k) * ny;
+  
+  return { R, cx, cy };
+}
+
+function isShapeClosed(s){
+  return s.closed === true;
+}
+
+// Get visible control points for selected spline segment
+
+function getHandlePositions(s, ptIdx) {
+  if(!s||s.type!=='spline')return{out:null,inn:null};
+  const p = s.points[ptIdx];
+  if (!p) return {out:null,inn:null};
+  const outH = {x: p.x + p.outT.x, y: p.y + p.outT.y};
+  const inH = {x: p.x + p.inT.x, y: p.y + p.inT.y};
+  return {out: outH, inn: inH};
+  if (v2 < 1e-5) return null;
+  const cross = Vx*Ay - Vy*Ax;
+  if (Math.abs(cross) < 1e-5) return null;
+  const k = cross / Math.pow(v2, 1.5);
+  let R = 1 / Math.abs(k);
+  if (R > 500) R = 500; // Limit to 500mm
+  
+  const vMag = Math.sqrt(v2);
+  const nx = -Vy / vMag;
+  const ny = Vx / vMag;
+  const cx = (t===0?P0.x:P1.x) + (1/k) * nx;
+  const cy = (t===0?P0.y:P1.y) + (1/k) * ny;
+  
+  return { R, cx, cy };
+}
+
+function isShapeClosed(s){
+  return s.closed === true;
+}
+
+// Get visible control points for selected spline segment
+
+function getHandlePositions(s, ptIdx) {
+  if(!s||s.type!=='spline')return{out:null,inn:null};
+  const p = s.points[ptIdx];
+  if (!p) return {out:null,inn:null};
+  const outH = {x: p.x + p.outT.x, y: p.y + p.outT.y};
+  const inH = {x: p.x + p.inT.x, y: p.y + p.inT.y};
+  return {out: outH, inn: inH};
+}
+
+function hitHandle(pos,s,ptIdx,side){
+  if(!s||s.type!=='spline')return false;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+  const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
+  const h=side==='out'?outH:inH;
+  if(!h)return false;
+  const dx=pLocal.x-h.x,dy=pLocal.y-h.y;
+  return dx*dx+dy*dy<25; // 5mm radius
+}
+
+let currentCurvature = null;
+
+function renderBezierHandles(sc){
+  const s=shapes.find(x=>x.id===selShapeId);
+  if(!s||s.type!=='spline'||selPtIdx===null)return;
+  const p=s.points[selPtIdx];
+  const{out:outH,inn:inH}=getHandlePositions(s,selPtIdx);
+  ctx.save();
+  ctx.setLineDash([2,2]);ctx.lineWidth=1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ctx.rotate(g.rotation*Math.PI/180);
+    ctx.translate(-circle.cx*sc,-circle.cy*sc);
+    const lx=(ctr.x+lbl.ox)*sc,ly=(ctr.y+lbl.oy)*sc;
+    ctx.font=`bold ${fs*sc}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.strokeStyle='#000a';ctx.lineWidth=3;ctx.strokeText(g.label,lx,ly);
+    ctx.fillStyle=g.color;ctx.fillText(g.label,lx,ly);
+    ctx.restore();
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  HIT TESTING
+// ═══════════════════════════════════════════════
+function hitPoint(pos){
+  const thresh=Math.max(2.5,6/viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+  // ── Draw mode ──
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    for(let j=0;j<s.points.length;j++){
+      if(Math.hypot(pLocal.x-s.points[j].x,pLocal.y-s.points[j].y)<thresh)
+        return{shapeId:s.id,ptIdx:j};
+    }
+  }
+  return null;
+}
+
+function hitSegment(pos){
+  const thresh=Math.max(1.5,4/viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+  // ── Draw mode ──
+    if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    const{pts}=getPolyline(s);
+    for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
+    if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
+  }
+  return null;
+}
+
+function segDist(p,a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+  if(l2===0)return Math.hypot(p.x-a.x,p.y-a.y);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+}
+
+function hitHandle(pos,s,ptIdx,side){
+  if (rawPts.length < 2) return null;
+  let d = `M ${rawPts[0].x.toFixed(2)} ${rawPts[0].y.toFixed(2)} `;
+  rawPts.slice(1).forEach(p => d += `L ${p.x.toFixed(2)} ${p.y.toFixed(2)} `);
+  if (closed) d += 'Z';
+  return d;
+}
+
+function getCurvature(P0, M0, P1, M1, t) {
+  let Vx, Vy, Ax, Ay;
+  if (t === 0) {
+    Vx = M0.x; Vy = M0.y;
+    Ax = 6*(P1.x - P0.x) - 4*M0.x - 2*M1.x;
+    Ay = 6*(P1.y - P0.y) - 4*M0.y - 2*M1.y;
+  } else {
+    Vx = M1.x; Vy = M1.y;
+    Ax = -6*(P1.x - P0.x) + 2*M0.x + 4*M1.x;
+    Ay = -6*(P1.y - P0.y) + 2*M0.y + 4*M1.y;
+  }
+  const v2 = Vx*Vx + Vy*Vy;
+  if (v2 < 1e-5) return null;
+  const cross = Vx*Ay - Vy*Ax;
+  if (Math.abs(cross) < 1e-5) return null;
+  const k = cross / Math.pow(v2, 1.5);
+  let R = 1 / Math.abs(k);
+  if (R > 500) R = 500; // Limit to 500mm
+  
+  const vMag = Math.sqrt(v2);
+  const nx = -Vy / vMag;
+  const ny = Vx / vMag;
+  const cx = (t===0?P0.x:P1.x) + (1/k) * nx;
+  const cy = (t===0?P0.y:P1.y) + (1/k) * ny;
+  
+  return { R, cx, cy };
+}
+
+function isShapeClosed(s){
+  return s.closed === true;
+}
+
+// Get visible control points for selected spline segment
+
+function getHandlePositions(s, ptIdx) {
+  if(!s||s.type!=='spline')return{out:null,inn:null};
+  const p = s.points[ptIdx];
+  if (!p) return {out:null,inn:null};
+  const closed = s.closed === true;
+  const n = s.points.length;
+  
+  const outH = {x: p.x + p.outT.x, y: p.y + p.outT.y};
+function renderGrid(sc) {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  bgCtx.save();
+  bgCtx.strokeStyle = '#223355';
+  bgCtx.lineWidth = 1;
+  const gridSize = 10 * sc; // 10mm grid
+  if (gridSize >= 5) {
+    bgCtx.beginPath();
+    const ox = (viewOffX % gridSize + gridSize) % gridSize;
+    const oy = (viewOffY % gridSize + gridSize) % gridSize;
+    for(let x = ox; x < W; x += gridSize) { bgCtx.moveTo(x, 0); bgCtx.lineTo(x, H); }
+    for(let y = oy; y < H; y += gridSize) { bgCtx.moveTo(0, y); bgCtx.lineTo(W, y); }
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+}
+
+function renderCanvasMode(sc) {
+  images.forEach(img => {
+     ctx.save();
+     ctx.translate(img.cx*sc, img.cy*sc);
+     ctx.rotate(img.rotation * Math.PI / 180);
+     ctx.drawImage(img.img, -img.w/2*sc, -img.h/2*sc, img.w*sc, img.h*sc);
+     ctx.restore();
+  });
+  
+  if (paperGuide.visible) {
+    ctx.save();
+    ctx.translate(paperGuide.cx*sc, paperGuide.cy*sc);
+    ctx.rotate(paperGuide.rotation * Math.PI / 180);
+    ctx.strokeStyle = canvSelType==='paper'?'#ff00ff':'#00ffff';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(-paperGuide.w/2*sc, -paperGuide.h/2*sc, paperGuide.w*sc, paperGuide.h*sc);
+    
+    ctx.beginPath();
+    ctx.moveTo(-5, 0); ctx.lineTo(5, 0);
+    ctx.moveTo(0, -5); ctx.lineTo(0, 5);
+    ctx.stroke();
+    
+    
+
+
+
+        for(let k in handles) {
+           ctx.beginPath();
+           if(k === 'rotH') ctx.arc(handles[k].x, handles[k].y, r, 0, Math.PI*2);
+           else ctx.rect(handles[k].x - r, handles[k].y - r, r*2, r*2);
+           ctx.fill(); ctx.stroke();
+        }
+     }
+  }
+}
+
+function render(){
+  const W=mainCanvas.width,H=mainCanvas.height,sc=MM*viewScale;
+  bgCtx.clearRect(0,0,W,H);
+  bgCtx.fillStyle=document.getElementById('cv-bg').value;
+  bgCtx.fillRect(0,0,W,H);
+  if(bgImage)bgCtx.drawImage(bgImage,0,0,W,H);
+  ctx.clearRect(0,0,W,H);
+  
+  renderGrid(sc);
+  renderCanvasMode(sc);
+  
+  shapes.forEach(s=>renderShape(s,sc));
+  if(drawing&&drawingShape)renderShape(drawingShape,sc,true);
+  renderCircle(sc);
+  if(currentMode==='arrange'||currentMode==='label')renderGroupMarkers(sc);
+  if(currentMode==='label')renderLabels(sc);
+  if(currentMode==='draw'&&drawTool==='select'&&selShapeId!==null&&selPtIdx!==null)renderBezierHandles(sc);
+}
+
+function renderCircle(sc){
+  const cx=circle.cx*sc,cy=circle.cy*sc,r=circle.r*sc;
+  ctx.save();
+  ctx.strokeStyle='#4488ff77';ctx.lineWidth=1;ctx.setLineDash([5,5]);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#4488ffcc';ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();
+  if(currentMode==='canvas'){
+    ctx.strokeStyle='#4488ff44';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.stroke();
+    ctx.fillStyle='#4488ffbb';ctx.font='11px sans-serif';
+    ctx.fillText(`⌀${(circle.r*2).toFixed(1)}mm`,cx+r+5,cy+4);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             {
+               label: '점 삭제',
+               action: () => {
+                 s.points.splice(hp.ptIdx, 1);
+                 if(s.points.length<2) shapes=shapes.filter(x=>x.id!==s.id);
+                 selPtIdx=null; render();
+               }
+             }
+           ]);
+           return;
+    const g=groups.find(x=>x.id===s.groupId);if(!g)return;
+    const lbl=labels[s.id]||{ox:4,oy:-4};
+    const ctr=shapeCenter(s);
+    ctx.save();
+    ctx.translate(circle.cx*sc,circle.cy*sc);
+    ctx.rotate(g.rotation*Math.PI/180);
+    ctx.translate(-circle.cx*sc,-circle.cy*sc);
+    const lx=(ctr.x+lbl.ox)*sc,ly=(ctr.y+lbl.oy)*sc;
+    ctx.font=`bold ${fs*sc}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.strokeStyle='#000a';ctx.lineWidth=3;ctx.strokeText(g.label,lx,ly);
+    ctx.fillStyle=g.color;ctx.fillText(g.label,lx,ly);
+    ctx.restore();
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  HIT TESTING
+// ═══════════════════════════════════════════════
+function hitPoint(pos){
+  const thresh=Math.max(2.5,6/viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+  // ── Draw mode ──
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    for(let j=0;j<s.points.length;j++){
+      if(Math.hypot(pLocal.x-s.points[j].x,pLocal.y-s.points[j].y)<thresh)
+        return{shapeId:s.id,ptIdx:j};
+    }
+  }
+  return null;
+}
+
+function hitSegment(pos){
+  const thresh=Math.max(1.5,4/viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+  // ── Draw mode ──
+    if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    const{pts}=getPolyline(s);
+    for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
+    if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
+  }
+  return null;
+}
+
+function segDist(p,a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+  if(l2===0)return Math.hypot(p.x-a.x,p.y-a.y);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+}
+
+function hitHandle(pos,s,ptIdx,side){
+  if(!s||s.type!=='spline')return false;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    const s=shapes[i];
+  // ── Draw mode ──
+    if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    const{pts}=getPolyline(s);
+    for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
+    if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
+  }
+  return null;
+}
+
+function segDist(p,a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+  if(l2===0)return Math.hypot(p.x-a.x,p.y-a.y);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+}
+
+function hitHandle(pos,s,ptIdx,side){
+  if(!s||s.type!=='spline')return false;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+  const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
+  const h=side==='out'?outH:inH;
+  if(!h)return false;
+  return Math.hypot(pLocal.x-h.x,pLocal.y-h.y)<Math.max(2,6/viewScale);
+}
+
+function hitGroupMarker(pos,g){
+  const rot=g.rotation*Math.PI/180;
+  shapes.forEach(s=>{
+    if(s.id===excludeId)return;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    s.points.forEach(p=>{
+      const pWorld = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
+      const d=Math.hypot(pos.x-pWorld.x,pos.y-pWorld.y);
+      i
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
+function snapToPoint(pos,excludeId=null){
+  let best=null,bestD=SNAP_D;
+  shapes.forEach(s=>{
+    if(s.id===excludeId)return;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    s.points.forEach(p=>{
+      const pWorld = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
+      const d=Math.hypot(pos.x-pWorld.x,pos.y-pWorld.y);
+      if(d<bestD){bestD=d;best=pWorld;}
+    });
+  });
+  if(drawingShape&&drawingShape.points.length>=2){
+    const p0=drawingShape.points[0];const d=Math.hypot(pos.x-p0.x,pos.y-p0.y);if(d<bestD){bestD=d;best=p0;}
+  }
+  return best;
+}
+
+// Ensure cps array exists and has correct length for shape
+function ensureCps(s){return;} function old_ensureCps(s){
+  const closed=isShapeClosed(s);
+  const rawPts=s.points;
+  const segs=closed?rawPts.length:rawPts.length-1;
+  if(!s.cps)s.cps=[];
+  while(s.cps.length<segs)s.cps.push([null,null]);
+
+
+
+        dragState={type:'cpOut',shapeId:s.id,ptIdx:selPtIdx};
+        return;
+      }
+      if(hitHandle(pos,s,selPtIdx,'in')){
+        dragState={type:'cpIn',shapeId:s.id,ptIdx:selPtIdx};
+        return;
+      }
+    }
+
+      // 2. Hit test control point
+    const hp=hitPoint(pos);
+    if(hp){
+      selShapeId=hp.shapeId;selPtIdx=hp.ptIdx;selHandle=null;dragState=null;
+      updatePropsPanel();render();return;
+    }
+    // 3. Hit test shape
+    const hs=hitSegment(pos);
+    if(hs){
+      selShapeId=hs.id;selPtIdx=null;selHandle=null;
+      dragState={type:'shape',shapeId:hs.id,startPos:{...pos},origPts:hs.points.map(p=>({...p})),origCps:hs.cps?JSON.parse(JSON.stringify(hs.cps)):null};
+      updatePropsPanel();render();return;
+    }
+    selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;
+    render();return;
+  }
+
+  // Drawing
+  const snapOff=e.ctrlKey;
+  let sx=pos.x,sy=pos.y;
+  if(!snapOff){const sn=snapToPoint(pos,drawing?drawingShape?.id:null);if(sn){sx=sn.x;sy=sn.y;}}
+  if(!drawing){
+    drawingShape={id:nextShapeId++,type:drawTool,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'sym'}],closed:false,strokeWidth,groupId:GROUP1_ID};
+    drawing=true;
+  } else {
+    const p0=drawingShape.points[0];
+    if(drawingShape.points.length>=2&&Math.hypot(sx-p0.x,sy-p0.y)<SNAP_D){
+      drawingShape.closed=true;finishDrawing();return;
+    }
+    drawingShape.points.push({x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'sym'});
+      if (drawingShape.type==='spline') updateHermiteTangents(drawingShape);
+  }
+  render();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      item.action();
+      cm.style.display = 'none';
+    };
+    cm.appendChild(btn);
+  });
+  cm.style.left = e.clientX + 'px';
+  cm.style.top = e.clientY + 'px';
+  cm.style.display = 'block';
+}
+
+window.addEventListener('click', () => {
+  const cm = document.getElementById('context-menu');
+  if(cm) cm.style.display = 'none';
+});
+
+mainCanvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(drawing){finishDrawing();return;}
+  if(currentMode==='draw' && drawTool==='select'){
+    const p = clientToMm(e);
+    const hp = hitPoint(p);
+    if(hp) {
+       const s = shapes.find(x => x.id === hp.shapeId);
+       
+         if(s && s.type === 'spline') {
+           const p = s.points[hp.ptIdx];
+           const isFree = p.mode === 'free';
+           showContextMenu(e, [
+             {
+               label: isFree ? '대칭 모드로 변환' : '자유 모드로 변환',
+    }
+  }
+  return null;
+}
+
+function hitSegment(pos){
+  const thresh=Math.max(1.5,4/viewScale);
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+  // ── Draw mode ──
+    if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
+    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+    const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+    const{pts}=getPolyline(s);
+    for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
+    if(isShapeClosed(s)&&pts.length>2&&segDist(pLocal,pts[pts.length-1],pts[0])<thresh)return s;
+  }
+  return null;
+}
+
+function segDist(p,a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+  if(l2===0)return Math.hypot(p.x-a.x,p.y-a.y);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+}
+
+function hitHandle(pos,s,ptIdx,side){
+  if(!s||s.type!=='spline')return false;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+  const{out:outH,inn:inH}=getHandlePositions(s,ptIdx);
+  const h=side==='out'?outH:inH;
+  if(!h)return false;
+  return 
+           label: '점 추가',
+           action: () => {
+             const closed = isShapeClosed(hs);
+             const n = hs.points.length;
+             const segs = closed ? n : n - 1;
+             
+             const g = hs.groupId ? groups.find(x=>x.id===hs.groupId) : null;
+             const pLocal = g ? rotAround(p, circle.cx, circle.cy, -g.rotation) : p;
+             
+             let bestSeg = null; let minD = Infinity; let bestT = 0;
+             for(let i=0; i<segs; i++) {
+               const p0 = hs.points[i];
+               const p1 = hs.points[(i+1)%n];
+               const cp0 = { x: p0.x + p0.outT.x / 3, y: p0.y + p0.outT.y / 3 };
+               const cp1 = { x: p1.x + p1.inT.x / 3, y: p1.y + p1.inT.y / 3 };
+               for(let t=0; t<=1; t+=0.02) {
+                 const u=1-t, x=u*u*u*p0.x+3*u*u*t*cp0.x+3*u*t*t*cp1.x+t*t*t*p1.x;
+                 const y=u*u*u*p0.y+3*u*u*t*cp0.y+3*u*t*t*cp1.y+t*t*t*p1.y;
+                 const d = Math.hypot(pLocal.x-x, pLocal.y-y);
+                 if(d < minD){ minD = d; bestSeg = i; bestT = t; }
+               }
+             }
+             
+             if(bestSeg !== null) {
+               const i = bestSeg;
+               const p0 = hs.points[i], p1 = hs.points[(i+1)%n];
+               const cp0 = { x: p0.x + p0.outT.x / 3, y: p0.y + p0.outT.y / 3 };
+               const cp1 = { x: p1.x + p1.inT.x / 3, y: p1.y + p1.inT.y / 3 };
+               
+               const u = 1 - bestT;
+               const nx = u*u*u*p0.x + 3*u*u*bestT*cp0.x + 3*u*bestT*bestT*cp1.x + bestT*bestT*bestT*p1.x;
+               const ny = u*u*u*p0.y + 3*u*u*bestT*cp0.y + 3*u*bestT*bestT*cp1.y + bestT*bestT*bestT*p1.y;
+               
+               const split = splitBezier(p0, cp0, cp1, p1, bestT);
+               const pt = split.left[3];
+               const r0 = split.left[2];
+               const r1 = split.right[1];
+               
+               const newPt = {
+                 x: nx,
+                 y: ny,
+                 inT: { x: 3 * (r0.x - pt.x), y: 3 * (r0.y - pt.y) },
+                 outT: { x: 3 * (r1.x - pt.x), y: 3 * (r1.y - pt.y) },
+                 mode: 'sym'
+               };
+               
+               hs.points.splice(i+1, 0, newPt);
+               updateHermiteTangents(hs);
+               render();
+             }
+           }
+         }
+       ]);
+       return;
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  CANVAS MODE HELPERS
+// ═══════════════════════════════════════════════
+function getTransformHandles(obj) {
+  const {cx, cy, w, h, rotation} = obj;
+  const rad = rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const rot = (x, y) => ({ x: cx + x*cos - y*sin, y: cy + x*sin + y*cos });
+    const activeObj = images.find(x => x.id === canvSelId);
+    if (activeObj) {
+     
+    const locDy = -dx * sin + dy * cos;
+    
+    let scaleX = 1, scaleY = 1;
+    if (canvSelHandle === 'tl') { scaleX = (canvDragStartObj.w - locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h - locDy*2) / canvDragStartObj.h; }
+    else if (canvSelHandle === 'tr') { scaleX = (canvDragStartObj.w + locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h - locDy*2) / canvDragStartObj.h; }
+    else if (canvSelHandle === 'br') { scaleX = (canvDragStartObj.w + locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h + locDy*2) / canvDragStartObj.h; }
+    else if (canvSelHandle === 'bl') { scaleX = (canvDragStartObj.w - locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h + locDy*2) / canvDragStartObj.h; }
+    
+    if (e.shiftKey) { const maxS = Math.max(scaleX, scaleY); scaleX = maxS; scaleY = maxS; }
+    obj.w = Math.max(10, canvDragStartObj.w * scaleX);
+    obj.h = Math.max(10, canvDragStartObj.h * scaleY);
+    
+    if (canvSelType === 'paper' && document.getElementById('pg-size').value === 'Custom') {
+      document.getElementById('cv-w').value = Math.round(obj.w);
+      document.getElementById('cv-h').value = Math.round(obj.h);
+    }
+  }
+  render();
+}
+function mCanvasUp(pos){ canvSelHandle = null; }
+
+  // ── Draw mode
+
+
+
+
+  if (hitTestCanvasObj(paperGuide, pos)) {
+    return { type: 'paper', id: null, handle: 'center' };
+  }
+  
+  return null;
+}
+
+  // ── Canvas mode ──
+function mCanvasDown(pos,e){
+  const target = getCanvasModeTarget(pos);
+  if (target) {
+    canvSelType = target.type;
+    canvSelId = target.id;
+    canvSelHandle = target.handle;
+    canvDragStartPos = { x: pos.x, y: pos.y };
+    const obj = canvSelType === 'paper' ? paperGuide : images.find(x => x.id === canvSelId);
+    if(obj) {
+      canvDragStartObj = { cx: obj.cx, cy: obj.cy, w: obj.w, h: obj.h, rotation: obj.rotation };
+    }
+  } else {
+    canvSelType = null;
+    canvSelId = null;
+    canvSelHandle = null;
+  }
+  render();
+}
+function mCanvasMove(pos,e){
+  if (!canvSelHandle || !_mdMm) return;
+  const obj = canvSelType === 'paper' ? paperGuide : images.find(x => x.id === canvSelId);
+  if (!obj) return;
+  
+  const dx = pos.x - canvDragStartPos.x;
+  const dy = pos.y - canvDragStartPos.y;
+  
+  if (canvSelHandle === 'center') {
+    let nx = canvDragStartObj.cx + dx;
+    let ny = canvDragStartObj.cy + dy;
+    if (e.shiftKey) {
+      if (Math.abs(dx) > Math.abs(dy)) ny = canvDragStartObj.cy;
+      else nx = canvDragStartObj.cx;
+    }
+    obj.cx = nx;
+    obj.cy = ny;
+  } else if (canvSelHandle === 'rotH') {
+    const cx = canvDragStartObj.cx, cy = canvDragStartObj.cy;
+    let ang = Math.atan2(pos.y - cy, pos.x - cx) * 180 / Math.PI + 90;
+    if (e.shiftKey) ang = Math.round(ang / 45) * 45;
+    obj.rotation = ang;
+  } else {
+    const rad = canvDragStartObj.rotation * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const locDx = dx * cos + dy * sin;
+    const locDy = -dx * sin + dy * cos;
+    
+    let scaleX = 1, scaleY = 1;
+    if (canvSelHandle === 'tl') { scaleX = (canvDragStartObj.w - locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h - locDy*2) / canvDragStartObj.h; }
+    else if (canvSelHandle === 'tr') { scaleX = (canvDragStartObj.w + locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h - locDy*2) / canvDragStartObj.h; }
+    else if (canvSelHandle === 'br') { scaleX = (canvDragStartObj.w + locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h + locDy*2) / canvDragStartObj.h; }
+    else if (canvSelHandle === 'bl') { scaleX = (canvDragStartObj.w - locDx*2) / canvDragStartObj.w; scaleY = (canvDragStartObj.h + locDy*2) / canvDragStartObj.h; }
+    
+    if (e.shiftKey) { const maxS = Math.max(scaleX, scaleY); scaleX = maxS; scaleY = maxS; }
+    obj.w = Math.max(10, canvDragStartObj.w * scaleX);
+    obj.h = Math.max(10, canvDragStartObj.h * scaleY);
+    
+    if (canvSelType === 'paper' && document.getElementById('pg-size').value === 'Custom') {
+      document.getElementById('cv-w').value = Math.round(obj.w);
+      document.getElementById('cv-h').value = Math.round(obj.h);
+    }
+  }
+  render();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             const pLocal = g ? rotAround(p, circle.cx, circle.cy, -g.rotation) : p;
+             
+             let bestSeg = null; let minD = Infinity; let bestT = 0;
+             for(let i=0; i<segs; i++) {
+               const p0 = hs.points[i];
+               const p1 = hs.points[(i+1)%n];
+               const cp0 = { x: p0.x + p0.outT.x / 3, y: p0.y + p0.outT.y / 3 };
+               const cp1 = { x: p1.x + p1.inT.x / 3, y: p1.y + p1.inT.y / 3 };
+               for(let t=0; t<=1; t+=0.02) {
+                 const u=1-t, x=u*u*u*p0.x+3*u*u*t*cp0.x+3*u*t*t*cp1.x+t*t*t*p1.x;
+                 const y=u*u*u*p0.y+3*u*u*t*cp0.y+3*u*t*t*cp1.y+t*t*t*p1.y;
+                 const d = Math.hypot(pLocal.x-x, pLocal.y-y);
+                 if(d < minD){ minD = d; bestSeg = i; bestT = t; }
+               }
+             }
+             
+             if(bestSeg !== null) {
+               const i = bestSeg;
+               const p0 = hs.points[i], p1 = hs.points[(i+1)%n];
+               const cp0 = { x: p0.x + p0.outT.x / 3, y: p0.y + p0.outT.y / 3 };
+               const cp1 = { x: p1.x + p1.inT.x / 3, y: p1.y + p1.inT.y / 3 };
+               
+               const u = 1 - bestT;
+               const nx = u*u*u*p0.x + 3*u*u*bestT*cp0.x + 3*u*bestT*bestT*cp1.x + bestT*bestT*bestT*p1.x;
+               const ny = u*u*u*p0.y + 3*u*u*bestT*cp0.y + 3*u*bestT*bestT*cp1.y + bestT*bestT*bestT*p1.y;
+               
+               const split = splitBezier(p0, cp0, cp1, p1, bestT);
+                const pt = split.left[3];
+                
+    const s=shapes.find(x=>x.id===dragState.shapeId);if(s){
+      const p = s.points[dragState.ptIdx];
+      p.outT = {x: pos.x - p.x, y: pos.y - p.y};
+      if (p.mode === 'sym') p.inT = {x: -p.outT.x, y: -p.outT.y};
+      
+      const closed = isShapeClosed(s);
+      const n = s.points.length;
+      let nextIdx = (dragState.ptIdx + 1) % n;
+      if (!closed && dragState.ptIdx === n - 1) { currentCurvature = null; }
+      else {
+        const p1 = s.points[nextIdx];
+        currentCurvature = getCurvature(p, p.outT, p1, {x: -p1.inT.x, y: -p1.inT.y}, 0);
+      }
+    }
+    render();return;
+  }
+  if(dragState?.type==='cpIn'){
+    const s=shapes.find(x=>x.id===dragState.shapeId);if(s){
+      const p = s.points[dragState.ptIdx];
+      p.inT = {x: pos.x - p.x, y: pos.y - p.y};
+      if (p.mode === 'sym') p.outT = {x: -p.inT.x, y: -p.inT.y};
+      
+      const closed = isShapeClosed(s);
+      const n = s.points.length;
+      let prevIdx = (dragState.ptIdx - 1 + n) % n;
+      if (!closed && dragState.ptIdx === 0) { currentCurvature = null; }
+      else {
+        const p0 = s.points[prevIdx];
+        currentCurvature = getCurvature(p0, p0.outT, p, {x: -p.inT.x, y: -p.inT.y}, 1);
+      }
+    }
+    render();return;
+  }
+
+  // Point drag (activated once hasDragged)
+  if(dragState?.type==='pt'&&_hasDragged){
+    const s=shapes.find(x=>x.id===dragState.shapeId);
+
+    if(s){
+      const g = s.groupId ? groups.find(x=>x.id===s.groupId) : null;
+      const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
+      
+      s.points[dragState.ptIdx].x=pLocal.x;
+      s.points[dragState.ptIdx].y=pLocal.y;
+      
+      if (s.type === 'spline') {
+        updateHermiteTangents(s);
+      }
+    }
+    render();return;
+  }
+
+  // Shape drag
+  if(dragState?.type==='shape'&&_hasDragged){
+    const s=shapes.find(x=>x.id===dragState.shapeId);
+    if(s){
+      const dx=pos.x-dragState.startPos.x,dy=pos.y-dragState.startPos.y;
+      s.points.forEach((p,i)=>{p.x=dragState.origPts[i].x+dx;p.y=dragState.origPts[i].y+dy;});
+      if(s.cps&&dragState.origCps){s.cps.forEach((seg,i)=>{if(seg&&dragState.origCps[i]){seg[0]={x:dragState.origCps[i][0].x+dx,y:dragState.origCps[i][0].y+dy};seg[1]={x:dragState.origCps[i][1].x+dx,y:dragState.origCps[i][1].y+dy};}});}
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  if(drawingShape.points.length>=2)shapes.push(drawingShape);
+  drawingShape=null;drawing=false;render();
+}
+function deleteSelectedShape(){
+  if(selShapeId!==null){shapes=shapes.filter(s=>s.id!==selShapeId);selShapeId=null;selPtIdx=null;dragState=null;}
+  render();
+}
+function clearAllShapes(){if(confirm('모든 도형을 삭제할까요?')){shapes=[];selShapeId=null;selPtIdx=null;render();}}
+
+function updatePropsPanel(){
+  if(selShapeId===null){document.getElementById('props-content').textContent='선택 없음';return;}
+  const s=shapes.find(x=>x.id===selShapeId);if(!s)return;
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  let h=`<b>도형 #${s.id}</b><br>타입: ${s.type}<br>두께: ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>그룹: ${g?'그룹'+g.label:'없음'}<br>점수: ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
+  if(selPtIdx!==null&&s.points[selPtIdx]){
+    const p=s.points[selPtIdx];
+    h+=`<br><br><b>??${selPtIdx}</b><br>x: ${p.x.toFixed(2)}<br>y: ${p.y.toFixed(2)}`;
+    if(s.type==='spline')h+=`<br><small style="color:#666">핸들 세부 보기<br>orange=입력, green=출력</small>`;
+  }
+  document.getElementById('props-content').innerHTML=h;
+}
+
+  // ── Arrange mode ──
+function mArrDown(pos,e){
+  // Group marker
+  for(const g of groups){
+    if(g.id===GROUP1_ID)continue;
+    if(hitGroupMarker(pos,g)){
+      arrDragState={type:'marker',groupId:g.id,startAng:Math.atan2(pos.y-circle.cy,pos.x-circle.cx),startRot:g.rotation};
+      render();return;
+    }
+  }
+  // ANY shape in ANY group
+  const hs=hitSegment(pos);
+  if(hs){
+    arrSelShapeId=hs.id;
+    // Follow to original if copy
+    const origId=hs._isCopy?hs._origId:hs.id;
+    arrDragState={type:'shape',shapeId:hs.id,origId,origGroupId:hs.groupId,startAng:Math.atan2(pos.y-circle.cy,pos.x-circle.cx),newGroupId:null};
+    refreshGroupList();render();return;
+  }
+  arrSelShapeId=null;arrDragState=null;refreshGroupList();render();
+}
+
+function mArrMove(pos,e){
+  if(!arrDragState||!_hasDragged)return;
+  const ang=Math.atan2(pos.y-circle.cy,pos.x-circle.cx);
+
+  if(arrDragState.type==='marker'){
+    const g=groups.find(x=>x.id===arrDragState.groupId);
+    if(g)g.rotation=arrDragState.startRot+(ang-arrDragState.startAng)*180/Math.PI;
+    render();return;
+  }
+
+  if(arrDragState.type==='shape'){
+    const origShape=shapes.find(x=>x.id===arrDragState.origId&&!x._isCopy)||shapes.find(x=>x.id===arrDragState.origId);
+    if(!origShape)return;
+    const delta=(ang-arrDragState.startAng)*180/Math.PI;
+    const baseRot=arrDragState.origGroupId?groups.find(x=>x.id===arrDragState.origGroupId)?.rotation||0:0;
+    const targetRot=baseRot+delta;
+
+    if(e.ctrlKey){
+      if(!arrDragState.newGroupId){
+        const ng={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:0,locked:false};
+        groups.push(ng);arrDragState.newGroupId=ng.id;refreshGroupList();
+      }
+      const ng=groups.fin
+
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        images.push({ id: nextImgId++, img: img, cx: circle.cx, cy: circle.cy, w: 100, h: 100 * img.height / img.width, rotation: 0 });
+        render();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+  // ── Keyboard ──
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(currentMode==='draw')setDrawTool('select');
+  }
+  if((e.key==='Delete'||e.key==='Backspace')&&!e.target.matches('input,textarea')){
+    if(currentMode==='draw')deleteSelectedShape();
+    else if(currentMode==='canvas' && canvSelType==='image' && canvSelId!==null) {
+      images = images.filter(x => x.id !== canvSelId);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.rdraw';a.click();
+}
+function loadProject(){document.getElementById('proj-input').click();}
+function onProjectLoaded(e){
+  const file=e.target.files[0];if(!file)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      canvasW=d.canvasW||200;canvasH=d.canvasH||200;baseW=d.baseW||canvasW;baseH=d.baseH||canvasH;
+      circle=d.circle||{cx:100,cy:100,r:75};
+      shapes=d.shapes||[];nextShapeId=shapes.reduce((m,s)=>Math.max(m,s.id+1),1);
+      groups=d.groups||[];nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
+      if(!groups.length)initDefaultGroup();
+      labels=d.labels||{};strokeWidth=d.strokeWidth||1;activeDrawGroupId=groups[0].id;
+      document.getElementById('cv-w').value=canvasW;document.getElementById('cv-h').value=canvasH;
+      document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
+      document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
+      document.getElementById('sw-num').value=strokeWidth.toFixed(2);document.getElementById('sw-range').value=strokeWidth;
+      syncAspectSlider();refreshGroupList();setCanvasSize();render();
+    }catch(err){alert('파일 오류: '+err.message);}
+  };
+  rd.readAsText(file);e.target.value='';
+}
+
+function showExportModal(){document.getElementById('export-modal').style.display='flex';}
+
+function renderOffscreen(mmScale){
+  const oc=document.createElement('canvas');
+  oc.width=Math.round(paperGuide.w*mmScale);oc.height=Math.round(paperGuide.h*mmScale);
+  const oc2=oc.getContext('2d');
+  oc2.fillStyle=document.getElementById('cv-bg').value;oc2.fillRect(0,0,oc.width,oc.height);
+  
+  oc2.save();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    rp.forEach(p=>{dxf+=`10\n${p.x.toFixed(4)}\n20\n${(-p.y).toFixed(4)}\n`;});
+  });
+  dxf+='0\nENDSEC\n0\nEOF\n';
+  const blob=new Blob([dxf],{type:'application/dxf'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.dxf';a.click();
+}
+
+function exportPDF(){
+  document.getElementById('export-modal').style.display='none';
+  const oc=renderOffscreen(EXPORT_MM);
+  const url=oc.toDataURL('image/png');
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><style>@page{size:${paperGuide.w}mm ${paperGuide.h}mm;margin:0}body{margin:0}img{width:${paperGuide.w}mm;height:${paperGuide.h}mm}</style></head><body><img src="${url}"></body></html>`);
+  win.document.close();win.onload=()=>win.print();
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+function init(){
+  initDefaultGroup();refreshGroupList();setCanvasSize();
+  const ar=canvasArea.getBoundingClientRect();
+  if(ar.width>0&&ar.height>0){
+    const sx=(ar.width-60)/(canvasW*MM),sy=(ar.height-60)/(canvasH*MM);
+    viewScale=Math.min(sx,sy,2);
+    viewOffX=(ar.width-canvasW*MM*viewScale)/2;
+    viewOffY=(ar.height-canvasH*MM*viewScale)/2;
+  }
+  setCanvasSize();setMode('canvas');render();
+}
+window.addEventListener('resize',()=>render());
+requestAnimationFrame(()=>requestAnimationFrame(init));
+</script>
+</body>
+</html>
+
