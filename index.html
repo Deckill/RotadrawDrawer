@@ -135,6 +135,14 @@
 <div class="modal-overlay" id="export-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal">
     <h3>내보내기</h3>
+    <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+      <label for="export-target" style="font-size: 14px; font-weight: 600;">SVG 대상:</label>
+      <select id="export-target" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit;">
+        <option value="all">전체 (도형+숫자)</option>
+        <option value="shapes">도형만 (구멍 뚫기용)</option>
+        <option value="labels">숫자만 (각인용)</option>
+      </select>
+    </div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="panel-btn" onclick="exportSVG()">SVG 벡터</button>
       <button class="panel-btn" onclick="exportPNG()">PNG (300dpi)</button>

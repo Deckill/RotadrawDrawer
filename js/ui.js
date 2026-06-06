@@ -217,27 +217,43 @@ function removeCopy(origId, targetGid) { shapes=shapes.filter(s=>!(s._origId===o
 function refreshGroupList() {
   // Arrange list
   const list=document.getElementById('group-list');
-  list.innerHTML='';
-  groups.forEach(g=>{
-    const d=document.createElement('div');
-    d.className='group-item';
-    const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
-    const isG1 = g.id === GROUP1_ID;
-    const rotInputHtml = isG1 ? 
-      `<input type="number" value="0" disabled style="width:55px; background:#2c2c2e; color:#8e8e93; border:none; cursor:not-allowed;">` :
-      `<input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">`;
-    d.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1">그룹 ${g.label}</span>${rotInputHtml}${delHtml}`;
-    list.appendChild(d);
-  });
+  if (list) {
+    list.innerHTML='';
+    groups.forEach(g=>{
+      const d=document.createElement('div');
+      d.className='group-item';
+      const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
+      const isG1 = g.id === GROUP1_ID;
+      const rotInputHtml = isG1 ? 
+        `<input type="number" value="0" disabled style="width:55px; background:#2c2c2e; color:#8e8e93; border:none; cursor:not-allowed;">` :
+        `<input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">`;
+      d.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1; margin-left:6px;">그룹 ${g.label}</span>${rotInputHtml}${delHtml}`;
+      list.appendChild(d);
+    });
+  }
   // Label panel
   const ll=document.getElementById('label-group-list');
-  ll.innerHTML='';
-  groups.forEach(g=>{
-    const row=document.createElement('div');
-    row.className='input-row';
-    row.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1;font-size:12px">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
-    ll.appendChild(row);
-  });
+  if (ll) {
+    ll.innerHTML='';
+    groups.forEach(g=>{
+      const row=document.createElement('div');
+      row.className='input-row';
+      row.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1;font-size:12px; margin-left:6px;">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
+      ll.appendChild(row);
+    });
+  }
+}
+
+function changeGroupColor(id, color) {
+  const g = groups.find(x => x.id === id);
+  if (g) {
+    if (g.color === color) return;
+    saveSnapshot();
+    g.color = color;
+    refreshGroupList();
+    render();
+    triggerAutosave();
+  }
 }
 
 function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render(); triggerAutosave();}}

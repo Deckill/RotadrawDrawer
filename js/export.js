@@ -233,46 +233,285 @@ function getGlobalBounds() {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
+const rawDigitSegs = {
+  '0': [[[ -0.3, -0.5 ], [ 0.3, -0.5 ]], [[ 0.3, -0.5 ], [ 0.3, 0.5 ]], [[ 0.3, 0.5 ], [ -0.3, 0.5 ]], [[ -0.3, 0.5 ], [ -0.3, -0.5 ]]],
+  '1': [[[ 0, -0.5 ], [ 0, 0.5 ]]],
+  '2': [[[ -0.3, -0.5 ], [ 0.3, -0.5 ]], [[ 0.3, -0.5 ], [ 0.3, 0 ]], [[ 0.3, 0 ], [ -0.3, 0 ]], [[ -0.3, 0 ], [ -0.3, 0.5 ]], [[ -0.3, 0.5 ], [ 0.3, 0.5 ]]],
+  '3': [[[ -0.3, -0.5 ], [ 0.3, -0.5 ]], [[ 0.3, -0.5 ], [ 0.3, 0.5 ]], [[ 0.3, 0.5 ], [ -0.3, 0.5 ]], [[ 0.3, 0 ], [ -0.3, 0 ]]],
+  '4': [[[ -0.3, -0.5 ], [ -0.3, 0 ]], [[ -0.3, 0 ], [ 0.3, 0 ]], [[ 0.3, -0.5 ], [ 0.3, 0.5 ]]],
+  '5': [[[ 0.3, -0.5 ], [ -0.3, -0.5 ]], [[ -0.3, -0.5 ], [ -0.3, 0 ]], [[ -0.3, 0 ], [ 0.3, 0 ]], [[ 0.3, 0 ], [ 0.3, 0.5 ]], [[ 0.3, 0.5 ], [ -0.3, 0.5 ]]],
+  '6': [[[ 0.3, -0.5 ], [ -0.3, -0.5 ]], [[ -0.3, -0.5 ], [ -0.3, 0.5 ]], [[ -0.3, 0.5 ], [ 0.3, 0.5 ]], [[ 0.3, 0.5 ], [ 0.3, 0 ]], [[ 0.3, 0 ], [ -0.3, 0 ]]],
+  '7': [[[ -0.3, -0.5 ], [ 0.3, -0.5 ]], [[ 0.3, -0.5 ], [ 0.3, 0.5 ]]],
+  '8': [[[ -0.3, -0.5 ], [ 0.3, -0.5 ]], [[ 0.3, -0.5 ], [ 0.3, 0.5 ]], [[ 0.3, 0.5 ], [ -0.3, 0.5 ]], [[ -0.3, 0.5 ], [ -0.3, -0.5 ]], [[ -0.3, 0 ], [ 0.3, 0 ]]],
+  '9': [[[ 0.3, 0.5 ], [ 0.3, -0.5 ]], [[ 0.3, -0.5 ], [ -0.3, -0.5 ]], [[ -0.3, -0.5 ], [ -0.3, 0 ]], [[ -0.3, 0 ], [ 0.3, 0 ]]]
+};
+
+const digitSegs = {};
+for(let k in rawDigitSegs) {
+  digitSegs[k] = rawDigitSegs[k].map(seg => {
+    const dx = seg[1][0] - seg[0][0];
+    const dy = seg[1][1] - seg[0][1];
+    const len = Math.hypot(dx, dy);
+    if(len < 1e-4) return seg;
+    const shrink = 0.12; // 0.1로 늘리되 두께 고려하여 조금 더 넉넉하게 0.12로 적용
+    const nx = dx/len * shrink;
+    const ny = dy/len * shrink;
+    return [
+      [seg[0][0] + nx, seg[0][1] + ny],
+      [seg[1][0] - nx, seg[1][1] - ny]
+    ];
+  });
+}
+
+function svgNativeOffsetPathD(s, rot, cx, cy) {
+  const SVG_SCALE = 96 / 25.4;
+  const f = v => (v * SVG_SCALE).toFixed(3);
+  const hw = (s.strokeWidth || strokeWidth) / 2;
+  const closed = s.closed === true;
+  
+  const norm = (dx, dy) => {
+    const d = Math.hypot(dx, dy);
+    return d > 1e-5 ? {x: -dy/d, y: dx/d} : null;
+  };
+
+  const lineIntersect = (pA, dirA, pB, dirB) => {
+    const det = dirA.x * dirB.y - dirA.y * dirB.x;
+    if(Math.abs(det) < 1e-5) return null;
+    const t = ((pB.x - pA.x) * dirB.y - (pB.y - pA.y) * dirB.x) / det;
+    return {x: pA.x + dirA.x * t, y: pA.y + dirA.y * t};
+  };
+
+  const getOffsetBezier = (p0, c0, c1, p1, offset) => {
+    const n1 = norm(c0.x - p0.x, c0.y - p0.y) || norm(c1.x - p0.x, c1.y - p0.y) || norm(p1.x - p0.x, p1.y - p0.y);
+    const n3 = norm(p1.x - c1.x, p1.y - c1.y) || norm(p1.x - c0.x, p1.y - c0.y) || norm(p1.x - p0.x, p1.y - p0.y);
+    const n2 = norm(c1.x - c0.x, c1.y - c0.y) || n1;
+
+    if(!n1 || !n3) return { q0: p0, q1: c0, q2: c1, q3: p1 };
+
+    const q0 = {x: p0.x + n1.x * offset, y: p0.y + n1.y * offset};
+    const q3 = {x: p1.x + n3.x * offset, y: p1.y + n3.y * offset};
+
+    const p1_offset = {x: c0.x + n2.x * offset, y: c0.y + n2.y * offset};
+    const dir1 = {x: c0.x - p0.x, y: c0.y - p0.y};
+    const dir2 = {x: c1.x - c0.x, y: c1.y - c0.y};
+    const dir3 = {x: p1.x - c1.x, y: p1.y - c1.y};
+
+    let q1 = lineIntersect(q0, dir1, p1_offset, dir2);
+    let q2 = lineIntersect(p1_offset, dir2, q3, dir3);
+
+    if(!q1) q1 = {x: q0.x + dir1.x, y: q0.y + dir1.y};
+    if(!q2) q2 = {x: q3.x - dir3.x, y: q3.y - dir3.y};
+
+    return {q0, q1, q2, q3};
+  };
+
+  const getOffsetLine = (p0, p1, offset) => {
+    const n = norm(p1.x - p0.x, p1.y - p0.y) || {x:0, y:1};
+    return {
+      q0: {x: p0.x + n.x * offset, y: p0.y + n.y * offset},
+      q3: {x: p1.x + n.x * offset, y: p1.y + n.y * offset}
+    };
+  };
+
+  const n = s.points.length;
+  if(n < 2) return null;
+
+  const isLine = s.type === 'line';
+  const segs = closed ? n : n - 1;
+  
+  const outerSegs = [];
+  const innerSegs = [];
+
+  for(let i=0; i<segs; i++) {
+    const p0_orig = s.points[i];
+    const p1_orig = s.points[(i+1)%n];
+    const p0 = rot !== 0 ? rotAround(p0_orig, cx, cy, rot) : p0_orig;
+    const p1 = rot !== 0 ? rotAround(p1_orig, cx, cy, rot) : p1_orig;
+    
+    if(isLine) {
+      outerSegs.push(getOffsetLine(p0, p1, hw));
+      innerSegs.push(getOffsetLine(p0, p1, -hw));
+    } else {
+      const c0_orig = {x: p0_orig.x + p0_orig.outT.x, y: p0_orig.y + p0_orig.outT.y};
+      const c1_orig = {x: p1_orig.x + p1_orig.inT.x, y: p1_orig.y + p1_orig.inT.y};
+      const c0 = rot !== 0 ? rotAround(c0_orig, cx, cy, rot) : c0_orig;
+      const c1 = rot !== 0 ? rotAround(c1_orig, cx, cy, rot) : c1_orig;
+      outerSegs.push(getOffsetBezier(p0, c0, c1, p1, hw));
+      innerSegs.push(getOffsetBezier(p0, c0, c1, p1, -hw));
+    }
+  }
+
+  for(let i=1; i<segs; i++) {
+    const midO = {x: (outerSegs[i-1].q3.x + outerSegs[i].q0.x)/2, y: (outerSegs[i-1].q3.y + outerSegs[i].q0.y)/2};
+    outerSegs[i-1].q3 = midO; outerSegs[i].q0 = midO;
+    const midI = {x: (innerSegs[i-1].q3.x + innerSegs[i].q0.x)/2, y: (innerSegs[i-1].q3.y + innerSegs[i].q0.y)/2};
+    innerSegs[i-1].q3 = midI; innerSegs[i].q0 = midI;
+  }
+  if(closed) {
+    const midO = {x: (outerSegs[segs-1].q3.x + outerSegs[0].q0.x)/2, y: (outerSegs[segs-1].q3.y + outerSegs[0].q0.y)/2};
+    outerSegs[segs-1].q3 = midO; outerSegs[0].q0 = midO;
+    const midI = {x: (innerSegs[segs-1].q3.x + innerSegs[0].q0.x)/2, y: (innerSegs[segs-1].q3.y + innerSegs[0].q0.y)/2};
+    innerSegs[segs-1].q3 = midI; innerSegs[0].q0 = midI;
+  }
+
+  let d = '';
+
+  if(!closed) {
+    d += `M ${f(outerSegs[0].q0.x)} ${f(outerSegs[0].q0.y)} `;
+    for(let i=0; i<segs; i++) {
+      const o = outerSegs[i];
+      if(isLine) d += `L ${f(o.q3.x)} ${f(o.q3.y)} `;
+      else d += `C ${f(o.q1.x)} ${f(o.q1.y)}, ${f(o.q2.x)} ${f(o.q2.y)}, ${f(o.q3.x)} ${f(o.q3.y)} `;
+    }
+    const endI = innerSegs[segs-1].q3;
+    d += `A ${f(hw)} ${f(hw)} 0 0 0 ${f(endI.x)} ${f(endI.y)} `;
+    
+    for(let i=segs-1; i>=0; i--) {
+      const inn = innerSegs[i];
+      if(isLine) d += `L ${f(inn.q0.x)} ${f(inn.q0.y)} `;
+      else d += `C ${f(inn.q2.x)} ${f(inn.q2.y)}, ${f(inn.q1.x)} ${f(inn.q1.y)}, ${f(inn.q0.x)} ${f(inn.q0.y)} `;
+    }
+    const startO = outerSegs[0].q0;
+    d += `A ${f(hw)} ${f(hw)} 0 0 0 ${f(startO.x)} ${f(startO.y)} Z`;
+  } else {
+    d += `M ${f(outerSegs[0].q0.x)} ${f(outerSegs[0].q0.y)} `;
+    for(let i=0; i<segs; i++) {
+      const o = outerSegs[i];
+      if(isLine) d += `L ${f(o.q3.x)} ${f(o.q3.y)} `;
+      else d += `C ${f(o.q1.x)} ${f(o.q1.y)}, ${f(o.q2.x)} ${f(o.q2.y)}, ${f(o.q3.x)} ${f(o.q3.y)} `;
+    }
+    d += 'Z ';
+    
+    d += `M ${f(innerSegs[segs-1].q3.x)} ${f(innerSegs[segs-1].q3.y)} `;
+    for(let i=segs-1; i>=0; i--) {
+      const inn = innerSegs[i];
+      if(isLine) d += `L ${f(inn.q0.x)} ${f(inn.q0.y)} `;
+      else d += `C ${f(inn.q2.x)} ${f(inn.q2.y)}, ${f(inn.q1.x)} ${f(inn.q1.y)}, ${f(inn.q0.x)} ${f(inn.q0.y)} `;
+    }
+    d += 'Z';
+  }
+
+  return d;
+}
+
+function getSquareLineD(p0, p1, hw) {
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-5) return null;
+  const nx = -dy/len * hw, ny = dx/len * hw;
+  const SVG_SCALE = 96 / 25.4;
+  const f = v => (v * SVG_SCALE).toFixed(3);
+  return `M ${f(p0.x + nx)} ${f(p0.y + ny)} L ${f(p1.x + nx)} ${f(p1.y + ny)} L ${f(p1.x - nx)} ${f(p1.y - ny)} L ${f(p0.x - nx)} ${f(p0.y - ny)} Z`;
+}
+
 function exportSVG(){
   document.getElementById('export-modal').style.display='none';
+  const targetSel = document.getElementById('export-target');
+  const exportTarget = targetSel ? targetSel.value : 'all'; // 'all', 'shapes', 'labels'
+  
   const bounds = getGlobalBounds();
-  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}" width="${bounds.w}mm" height="${bounds.h}mm">\n`;
-  svg+=`<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}" fill="${document.getElementById('cv-bg').value}"/>\n`;
+  
+  const SVG_SCALE = 96 / 25.4;
+  const fs = v => (v * SVG_SCALE).toFixed(3);
+
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${fs(bounds.x)} ${fs(bounds.y)} ${fs(bounds.w)} ${fs(bounds.h)}" width="${bounds.w}mm" height="${bounds.h}mm">\n`;
+  svg+=`<rect x="${fs(bounds.x)}" y="${fs(bounds.y)}" width="${fs(bounds.w)}" height="${fs(bounds.h)}" fill="${document.getElementById('cv-bg').value}"/>\n`;
   images.forEach(img => {
-    svg += `<image x="${img.cx - img.w/2}" y="${img.cy - img.h/2}" width="${img.w}" height="${img.h}" href="${img.img.src}" transform="rotate(${img.rotation} ${img.cx} ${img.cy})" />\n`;
+    svg += `<image x="${fs(img.cx - img.w/2)}" y="${fs(img.cy - img.h/2)}" width="${fs(img.w)}" height="${fs(img.h)}" href="${img.img.src}" transform="rotate(${img.rotation} ${fs(img.cx)} ${fs(img.cy)})" />\n`;
   });
-  groups.forEach(g=>{
-    svg+=`<g transform="rotate(${g.rotation},${circle.cx},${circle.cy})">\n`;
-    shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
-      const d=svgPathD(s);
-      if(d){
-        const sw = s.strokeWidth || strokeWidth;
-        if(s.closed){
-          svg+=`  <path d="${d}" fill="${g.color}" stroke="${g.color}" stroke-width="${sw}" stroke-linejoin="miter" />\n`;
-        } else {
-          svg+=`  <path d="${d}" fill="none" stroke="${g.color}" stroke-width="${sw}" stroke-linejoin="miter" stroke-linecap="round" />\n`;
+  
+  if (exportTarget === 'all' || exportTarget === 'shapes') {
+    groups.forEach(g=>{
+      shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
+        if(s.points.length >= 2){
+          const d = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          if(d){
+            svg+=`  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
+          }
+        }
+      });
+    });
+  }
+
+  if (exportTarget === 'all' || exportTarget === 'labels') {
+    // 숫자 레이블 SVG 추가 (모든 복제 그룹 포함, 벡터화)
+    const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+    shapes.forEach(s => {
+      if(!s.groupId)return;
+      if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
+      const g=groups.find(x=>x.id===s.groupId);if(!g)return;
+      const targetId = s._isCopy ? s._origId : s.id;
+      const lbl=labels[targetId]||{ox:4,oy:-4};
+      const ctr = shapeCenter(s);
+      
+      const lx = ctr.x + lbl.ox;
+      const ly = ctr.y + lbl.oy;
+      
+      const strStr = String(g.label);
+      const letterSpacing = 0.8;
+      const totalWidth = (strStr.length - 1) * letterSpacing;
+      const startX = -totalWidth / 2;
+      const hw = Math.max(0.2, labelSize * 0.08); // 레이블 굵기
+      
+      for(let i=0; i<strStr.length; i++) {
+        const char = strStr[i];
+        if (digitSegs[char]) {
+          const offsetX = startX + i * letterSpacing;
+          digitSegs[char].forEach(seg => {
+            const p1 = { x: lx + (seg[0][0] + offsetX) * labelSize, y: ly + seg[0][1] * labelSize };
+            const p2 = { x: lx + (seg[1][0] + offsetX) * labelSize, y: ly + seg[1][1] * labelSize };
+            const rp1 = g.rotation !== 0 ? rotAround(p1, circle.cx, circle.cy, g.rotation) : p1;
+            const rp2 = g.rotation !== 0 ? rotAround(p2, circle.cx, circle.cy, g.rotation) : p2;
+            const d = getSquareLineD(rp1, rp2, hw);
+            if (d) svg += `  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
+          });
         }
       }
     });
-    svg+=`</g>\n`;
-  });
-  
-  // 가이드 원 SVG 추가 (중심 원 실선)
-  svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="${circle.r.toFixed(2)}" stroke="#4488ff" stroke-opacity="0.67" stroke-width="0.5" stroke-dasharray="5,5" fill="none" />\n`;
-  svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="2.5" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="0.4" />\n`;
-  
-  // 그룹 마커 핸들 SVG 추가
-  groups.forEach(g => {
-    const edgeY = -circle.r;
-    svg += `  <g transform="rotate(${g.rotation}, ${circle.cx}, ${circle.cy})">\n`;
-    svg += `    <rect x="-0.5" y="${(edgeY - 3).toFixed(2)}" width="1" height="6" fill="${g.color}" fill-opacity="0.73" stroke="${g.color}" stroke-width="0.5" />\n`;
-    svg += `    <text x="4.5" y="${edgeY.toFixed(2)}" fill="#ffffff" font-family="sans-serif" font-weight="bold" font-size="3.5" dominant-baseline="middle" text-anchor="start">${g.label}</text>\n`;
-    svg += `  </g>\n`;
-  });
+    
+    // 가이드 원 SVG 추가 (중심 원 실선)
+    svg += `<circle cx="${fs(circle.cx)}" cy="${fs(circle.cy)}" r="${fs(circle.r)}" stroke="#4488ff" stroke-opacity="0.67" stroke-width="${fs(0.5)}" stroke-dasharray="${fs(5)},${fs(5)}" fill="none" />\n`;
+    svg += `<circle cx="${fs(circle.cx)}" cy="${fs(circle.cy)}" r="${fs(2.5)}" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="${fs(0.4)}" />\n`;
+    
+    // 그룹 마커 핸들 SVG 추가 (벡터화)
+    groups.forEach(g => {
+      const edgeY = -circle.r;
+      const mRot = g.rotation;
+      
+      const rp1 = rotAround({x: circle.cx, y: circle.cy + edgeY - 3}, circle.cx, circle.cy, mRot);
+      const rp2 = rotAround({x: circle.cx, y: circle.cy + edgeY + 3}, circle.cx, circle.cy, mRot);
+      const dLine = getSquareLineD(rp1, rp2, 0.5);
+      if(dLine) svg += `  <path d="${dLine}" fill="${g.color}" stroke="none" fill-opacity="0.73" />\n`;
+      
+      const strStr = String(g.label);
+      const mLabelSize = 3.5;
+      const letterSpacing = 0.8;
+      const totalWidth = (strStr.length - 1) * letterSpacing;
+      const lxCenter = circle.cx + 4.5 + (totalWidth * mLabelSize) / 2;
+      const ly = circle.cy + edgeY;
+      const mHw = 0.25;
+      
+      for(let i=0; i<strStr.length; i++) {
+        const char = strStr[i];
+        if (digitSegs[char]) {
+          const offsetX = -totalWidth/2 + i * letterSpacing;
+          digitSegs[char].forEach(seg => {
+            const p1 = { x: lxCenter + (seg[0][0] + offsetX) * mLabelSize, y: ly + seg[0][1] * mLabelSize };
+            const p2 = { x: lxCenter + (seg[1][0] + offsetX) * mLabelSize, y: ly + seg[1][1] * mLabelSize };
+            const p1Rot = rotAround(p1, circle.cx, circle.cy, mRot);
+            const p2Rot = rotAround(p2, circle.cx, circle.cy, mRot);
+            const dText = getSquareLineD(p1Rot, p2Rot, mHw);
+            if (dText) svg += `  <path d="${dText}" fill="${g.color}" stroke="none" />\n`;
+          });
+        }
+      }
+    });
+  }
 
   svg+='</svg>';
+  const filename = exportTarget === 'shapes' ? 'rotadraw_shapes.svg' : (exportTarget === 'labels' ? 'rotadraw_labels.svg' : 'rotadraw.svg');
   const blob=new Blob([svg],{type:'image/svg+xml'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.svg';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
 }
 
 function svgPathD(s) {

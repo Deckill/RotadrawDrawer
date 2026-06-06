@@ -211,8 +211,10 @@ function renderLabels(sc){
   const fs=parseFloat(document.getElementById('label-size').value)||4;
   shapes.forEach(s=>{
     if(!s.groupId)return;
+    if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
     const g=groups.find(x=>x.id===s.groupId);if(!g)return;
-    const lbl=labels[s.id]||{ox:4,oy:-4};
+    const targetId = s._isCopy ? s._origId : s.id;
+    const lbl=labels[targetId]||{ox:4,oy:-4};
     const ctr=shapeCenter(s);
     ctx.save();
     ctx.translate(circle.cx*sc,circle.cy*sc);

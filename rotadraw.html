@@ -29,7 +29,23 @@ body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; he
 #group-list { display: flex; flex-direction: column; gap: 4px; }
 .group-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #0f3460; border-radius: 4px; border: 1px solid #1a4a7a; cursor: pointer; font-size: 12px; }
 .group-item:hover { background: #1a5a9a; }
-.group-color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.group-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.group-color-dot::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.group-color-dot::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
 .group-del { margin-left: auto; color: #666; font-size: 13px; cursor: pointer; padding: 0 2px; }
 .group-del:hover { color: #e94560; }
 .group-del.locked { color: #333; pointer-events: none; }
@@ -1411,7 +1427,8 @@ function renderLabels(sc){
   shapes.forEach(s=>{
     if(!s.groupId)return;
     const g=groups.find(x=>x.id===s.groupId);if(!g)return;
-    const lbl=labels[s.id]||{ox:4,oy:-4};
+    const targetId = s._isCopy ? s._origId : s.id;
+    const lbl=labels[targetId]||{ox:4,oy:-4};
     const ctr=shapeCenter(s);
     ctx.save();
     ctx.translate(circle.cx*sc,circle.cy*sc);
@@ -1875,12 +1892,13 @@ function mLblDown(pos,e){
   for(const s of shapes){
     if(!s.groupId)continue;
     const g=groups.find(x=>x.id===s.groupId);if(!g)continue;
-    const lbl=labels[s.id]||{ox:4,oy:-4};
+    const targetId = s._isCopy ? s._origId : s.id;
+    const lbl=labels[targetId]||{ox:4,oy:-4};
     const ctr=shapeCenter(s);
     const lp=rotAround(pos,circle.cx,circle.cy,-g.rotation);
     const fs=parseFloat(document.getElementById('label-size').value)||4;
     if(Math.hypot(lp.x-(ctr.x+lbl.ox),lp.y-(ctr.y+lbl.oy))<fs){
-      lblDrag={shapeId:s.id,startLocal:lp,startOx:lbl.ox,startOy:lbl.oy};return;
+      lblDrag={shapeId:s.id,targetId:targetId,startLocal:lp,startOx:lbl.ox,startOy:lbl.oy};return;
     }
   }
   lblDrag=null;
@@ -1894,14 +1912,21 @@ function mLblMove(pos,e){
   let ox=lblDrag.startOx+(lp.x-lblDrag.startLocal.x);
   let oy=lblDrag.startOy+(lp.y-lblDrag.startLocal.y);
   const ctr=shapeCenter(s);
-  const d=distToShape({x:ctr.x+ox,y:ctr.y+oy},s);
+  
+  const pWorld = g ? rotAround({x:ctr.x+ox, y:ctr.y+oy}, circle.cx, circle.cy, g.rotation) : {x:ctr.x+ox, y:ctr.y+oy};
+  const d=distToShape(pWorld,s);
   if(d>MAX_LBL){
     const mag=Math.hypot(ox,oy)||1;let lo=0,hi=mag;
-    for(let k=0;k<20;k++){const mid=(lo+hi)/2;if(distToShape({x:ctr.x+ox/mag*mid,y:ctr.y+oy/mag*mid},s)<=MAX_LBL)lo=mid;else hi=mid;}
+    for(let k=0;k<20;k++){
+      const mid=(lo+hi)/2;
+      const pMidWorld = g ? rotAround({x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid}, circle.cx, circle.cy, g.rotation) : {x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid};
+      if(distToShape(pMidWorld,s)<=MAX_LBL)lo=mid;else hi=mid;
+    }
     ox=ox/mag*lo;oy=oy/mag*lo;
   }
-  if(!labels[s.id])labels[s.id]={ox:4,oy:-4};
-  labels[s.id].ox=ox;labels[s.id].oy=oy;render();
+  const targetId = lblDrag.targetId;
+  if(!labels[targetId])labels[targetId]={ox:4,oy:-4};
+  labels[targetId].ox=ox;labels[targetId].oy=oy;render();
 }
 
 function mLblUp(pos){lblDrag=null;render();}
@@ -2137,27 +2162,43 @@ function removeCopy(origId, targetGid) { shapes=shapes.filter(s=>!(s._origId===o
 function refreshGroupList() {
   // Arrange list
   const list=document.getElementById('group-list');
-  list.innerHTML='';
-  groups.forEach(g=>{
-    const d=document.createElement('div');
-    d.className='group-item';
-    const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
-    const isG1 = g.id === GROUP1_ID;
-    const rotInputHtml = isG1 ? 
-      `<input type="number" value="0" disabled style="width:55px; background:#2c2c2e; color:#8e8e93; border:none; cursor:not-allowed;">` :
-      `<input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">`;
-    d.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1">그룹 ${g.label}</span>${rotInputHtml}${delHtml}`;
-    list.appendChild(d);
-  });
+  if (list) {
+    list.innerHTML='';
+    groups.forEach(g=>{
+      const d=document.createElement('div');
+      d.className='group-item';
+      const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
+      const isG1 = g.id === GROUP1_ID;
+      const rotInputHtml = isG1 ? 
+        `<input type="number" value="0" disabled style="width:55px; background:#2c2c2e; color:#8e8e93; border:none; cursor:not-allowed;">` :
+        `<input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">`;
+      d.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1; margin-left:6px;">그룹 ${g.label}</span>${rotInputHtml}${delHtml}`;
+      list.appendChild(d);
+    });
+  }
   // Label panel
   const ll=document.getElementById('label-group-list');
-  ll.innerHTML='';
-  groups.forEach(g=>{
-    const row=document.createElement('div');
-    row.className='input-row';
-    row.innerHTML=`<div class="group-color-dot" style="background:${g.color}"></div><span style="flex:1;font-size:12px">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
-    ll.appendChild(row);
-  });
+  if (ll) {
+    ll.innerHTML='';
+    groups.forEach(g=>{
+      const row=document.createElement('div');
+      row.className='input-row';
+      row.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1;font-size:12px; margin-left:6px;">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
+      ll.appendChild(row);
+    });
+  }
+}
+
+function changeGroupColor(id, color) {
+  const g = groups.find(x => x.id === id);
+  if (g) {
+    if (g.color === color) return;
+    saveSnapshot();
+    g.color = color;
+    refreshGroupList();
+    render();
+    triggerAutosave();
+  }
 }
 
 function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render(); triggerAutosave();}}
@@ -2630,17 +2671,33 @@ function exportSVG(){
     });
     svg+=`</g>\n`;
   });
+
+  // 숫자 레이블 SVG 추가 (모든 복제 그룹 포함)
+  const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+  shapes.forEach(s => {
+    if (!s.groupId) return;
+    const g = groups.find(x => x.id === s.groupId); if (!g) return;
+    const targetId = s._isCopy ? s._origId : s.id;
+    const lbl = labels[targetId] || {ox:4, oy:-4};
+    const ctr = shapeCenter(s);
+    
+    const lx = ctr.x + lbl.ox;
+    const ly = ctr.y + lbl.oy;
+    const pWorld = g.rotation !== 0 ? rotAround({x: lx, y: ly}, circle.cx, circle.cy, g.rotation) : {x: lx, y: ly};
+    
+    svg += `  <text x="${pWorld.x.toFixed(2)}" y="${pWorld.y.toFixed(2)}" fill="${g.color}" stroke="#000000" stroke-width="0.3" font-family="sans-serif" font-weight="bold" font-size="${labelSize.toFixed(2)}" text-anchor="middle" dominant-baseline="central">${g.label}</text>\n`;
+  });
   
   // 가이드 원 SVG 추가 (중심 원 실선)
   svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="${circle.r.toFixed(2)}" stroke="#4488ff" stroke-opacity="0.67" stroke-width="0.5" stroke-dasharray="5,5" fill="none" />\n`;
   svg += `<circle cx="${circle.cx.toFixed(2)}" cy="${circle.cy.toFixed(2)}" r="2.5" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="0.4" />\n`;
   
-  // 그룹 마커 핸들 SVG 추가
+  // 그룹 마커 핸들 SVG 추가 (중심 좌표 변위 교정)
   groups.forEach(g => {
     const edgeY = -circle.r;
     svg += `  <g transform="rotate(${g.rotation}, ${circle.cx}, ${circle.cy})">\n`;
-    svg += `    <rect x="-0.5" y="${(edgeY - 3).toFixed(2)}" width="1" height="6" fill="${g.color}" fill-opacity="0.73" stroke="${g.color}" stroke-width="0.5" />\n`;
-    svg += `    <text x="4.5" y="${edgeY.toFixed(2)}" fill="#ffffff" font-family="sans-serif" font-weight="bold" font-size="3.5" dominant-baseline="middle" text-anchor="start">${g.label}</text>\n`;
+    svg += `    <rect x="${(circle.cx - 0.5).toFixed(2)}" y="${(circle.cy + edgeY - 3).toFixed(2)}" width="1" height="6" fill="${g.color}" fill-opacity="0.73" stroke="${g.color}" stroke-width="0.5" />\n`;
+    svg += `    <text x="${(circle.cx + 4.5).toFixed(2)}" y="${(circle.cy + edgeY).toFixed(2)}" fill="#ffffff" font-family="sans-serif" font-weight="bold" font-size="3.5" dominant-baseline="middle" text-anchor="start">${g.label}</text>\n`;
     svg += `  </g>\n`;
   });
 

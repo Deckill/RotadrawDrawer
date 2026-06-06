@@ -401,15 +401,18 @@ function mArrUp(pos,e){
 }
 
 function mLblDown(pos,e){
-  for(const s of shapes){
+  for(let i=shapes.length-1; i>=0; i--){
+    const s = shapes[i];
     if(!s.groupId)continue;
+    if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
     const g=groups.find(x=>x.id===s.groupId);if(!g)continue;
-    const lbl=labels[s.id]||{ox:4,oy:-4};
+    const targetId = s._isCopy ? s._origId : s.id;
+    const lbl=labels[targetId]||{ox:4,oy:-4};
     const ctr=shapeCenter(s);
     const lp=rotAround(pos,circle.cx,circle.cy,-g.rotation);
     const fs=parseFloat(document.getElementById('label-size').value)||4;
     if(Math.hypot(lp.x-(ctr.x+lbl.ox),lp.y-(ctr.y+lbl.oy))<fs){
-      lblDrag={shapeId:s.id,startLocal:lp,startOx:lbl.ox,startOy:lbl.oy};return;
+      lblDrag={shapeId:s.id,targetId:targetId,startLocal:lp,startOx:lbl.ox,startOy:lbl.oy};return;
     }
   }
   lblDrag=null;
@@ -423,17 +426,31 @@ function mLblMove(pos,e){
   let ox=lblDrag.startOx+(lp.x-lblDrag.startLocal.x);
   let oy=lblDrag.startOy+(lp.y-lblDrag.startLocal.y);
   const ctr=shapeCenter(s);
-  const d=distToShape({x:ctr.x+ox,y:ctr.y+oy},s);
+  
+  const pWorld = g ? rotAround({x:ctr.x+ox, y:ctr.y+oy}, circle.cx, circle.cy, g.rotation) : {x:ctr.x+ox, y:ctr.y+oy};
+  const d=distToShape(pWorld,s);
   if(d>MAX_LBL){
     const mag=Math.hypot(ox,oy)||1;let lo=0,hi=mag;
-    for(let k=0;k<20;k++){const mid=(lo+hi)/2;if(distToShape({x:ctr.x+ox/mag*mid,y:ctr.y+oy/mag*mid},s)<=MAX_LBL)lo=mid;else hi=mid;}
+    for(let k=0;k<20;k++){
+      const mid=(lo+hi)/2;
+      const pMidWorld = g ? rotAround({x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid}, circle.cx, circle.cy, g.rotation) : {x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid};
+      if(distToShape(pMidWorld,s)<=MAX_LBL)lo=mid;else hi=mid;
+    }
     ox=ox/mag*lo;oy=oy/mag*lo;
   }
-  if(!labels[s.id])labels[s.id]={ox:4,oy:-4};
-  labels[s.id].ox=ox;labels[s.id].oy=oy;render();
+  const targetId = lblDrag.targetId;
+  if(!labels[targetId])labels[targetId]={ox:4,oy:-4};
+  labels[targetId].ox=ox;labels[targetId].oy=oy;render();
 }
 
-function mLblUp(pos){lblDrag=null;render();}
+function mLblUp(pos){
+  if(lblDrag) {
+    saveSnapshot();
+    triggerAutosave();
+  }
+  lblDrag=null;
+  render();
+}
 
 function finishDrawing(){
   if(!drawingShape){drawing=false;return;}
