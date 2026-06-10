@@ -364,7 +364,7 @@ function svgPathD(s){
 // ═══════════════════════════════════════════════
 
 window.addEventListener('resize',()=>{setCanvasSize();render();});
-requestAnimationFrame(()=>requestAnimationFrame(init));
+window.addEventListener('DOMContentLoaded', () => init());
 let currentSplineAlgo = "natural"; // natural, catmull, bspline
 
 function triggerAutosave() {

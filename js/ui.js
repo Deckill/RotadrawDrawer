@@ -31,12 +31,12 @@ function deleteSelectedShape(){
   triggerAutosave();
 }
 
-function clearAllShapes(){if(confirm('모든 도형을 삭제할까요?')){saveSnapshot();shapes=[];selShapeId=null;selPtIdx=null;render();triggerAutosave();}}
+function clearAllShapes(){if(confirm(t('confirm_del_all'))){saveSnapshot();shapes=[];selShapeId=null;selPtIdx=null;render();triggerAutosave();}}
 
 function updatePropsPanel(){
+  const d=document.getElementById('props-content');
   if(selShapeId===null){
-    document.getElementById('props-content').textContent='선택 없음';
-    // 선택 없으면 opacity 슬라이더 1로 리셋
+    d.textContent=t('선택 없음');
     const opr=document.getElementById('shape-opacity-range');
     const opn=document.getElementById('shape-opacity-num');
     if(opr){opr.value='1';opn.value='1.00';}
@@ -44,14 +44,13 @@ function updatePropsPanel(){
   }
   const s=shapes.find(x=>x.id===selShapeId);if(!s)return;
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  let h=`<b>도형 #${s.id}</b><br>타입: ${s.type}<br>두께: ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>그룹: ${g?'그룹'+g.label:'없음'}<br>점수: ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
+  let h=`<b>${t('도형')} #${s.id}</b><br>${t('타입:')} ${s.type}<br>${t('두께:')} ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>${t('그룹')}: ${g?t('그룹')+' '+g.label:t('없음')}<br>${t('점수:')} ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
   if(selPtIdx!==null&&s.points[selPtIdx]){
     const p=s.points[selPtIdx];
-    h+=`<br><br><b>점${selPtIdx}</b><br>x: ${p.x.toFixed(2)}<br>y: ${p.y.toFixed(2)}`;
-    if(s.type==='spline')h+=`<br><small style="color:#666">핸들 세부 보기<br>orange=입력, green=출력</small>`;
+    h+=`<br><br><b>${t('점')}${selPtIdx}</b><br>x: ${p.x.toFixed(2)}<br>y: ${p.y.toFixed(2)}`;
+    if(s.type==='spline')h+=`<br><small style="color:#666">${t('핸들 세부 보기')}<br>orange=${t('입력')}, green=${t('출력')}</small>`;
   }
-  document.getElementById('props-content').innerHTML=h;
-  // 선택 도형의 opacity로 슬라이더 업데이트
+  d.innerHTML=h;
   const opVal = (s.opacity !== undefined ? s.opacity : 1.0).toFixed(2);
   const opr=document.getElementById('shape-opacity-range');
   const opn=document.getElementById('shape-opacity-num');
@@ -220,14 +219,15 @@ function refreshGroupList() {
   if (list) {
     list.innerHTML='';
     groups.forEach(g=>{
+      const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
       const d=document.createElement('div');
       d.className='group-item';
-      const delHtml=g.locked?`<span class="group-del locked">잠금</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
+      const delHtml=g.locked?`<span class="group-del locked">${t("locked")}</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
       const isG1 = g.id === GROUP1_ID;
       const rotInputHtml = isG1 ? 
         `<input type="number" value="0" disabled style="width:55px; background:#2c2c2e; color:#8e8e93; border:none; cursor:not-allowed;">` :
         `<input type="number" value="${g.rotation}" min="-360" max="360" style="width:55px" oninput="setGroupRotation(${g.id},this.value)" onclick="event.stopPropagation()">`;
-      d.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1; margin-left:6px;">그룹 ${g.label}</span>${rotInputHtml}${delHtml}`;
+      d.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1; margin-left:6px;">${t("group")} ${g.label} (${count}${t("items")})</span>${rotInputHtml}${delHtml}`;
       list.appendChild(d);
     });
   }
@@ -236,9 +236,20 @@ function refreshGroupList() {
   if (ll) {
     ll.innerHTML='';
     groups.forEach(g=>{
+      const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
       const row=document.createElement('div');
       row.className='input-row';
-      row.innerHTML=`<input type="color" class="group-color-dot" value="${g.color}" onchange="changeGroupColor(${g.id},this.value)" onclick="event.stopPropagation()"><span style="flex:1;font-size:12px; margin-left:6px;">그룹 ${g.label}</span><input type="number" value="${g.label}" min="1" max="999" style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="setGroupLabel(${g.id},this.value)">`;
+      
+      let selectHtml = `<select style="width:48px;background:#0f3460;border:1px solid #1a4a7a;border-radius:3px;color:#eee;padding:3px;font-size:12px;flex:none" onchange="swapGroupLabel(${g.id},this.value)">`;
+      groups.forEach(otherG => {
+        const selected = otherG.id === g.id ? 'selected' : '';
+        selectHtml += `<option value="${otherG.id}" ${selected}>${otherG.label}</option>`;
+      });
+      selectHtml += `</select>`;
+
+      const labelHtml=`<span style="flex:1; margin-left:6px; margin-right:6px">${t("group")} ${g.label} (${count}${t("items")})</span>`;
+      
+      row.innerHTML = selectHtml + labelHtml;
       ll.appendChild(row);
     });
   }
@@ -464,4 +475,85 @@ function updateImageSizeUI() {
       num.value = 100;
     }
   }
+}
+
+function swapGroupLabel(id1, id2Str) {
+  const id2 = parseInt(id2Str);
+  if(id1 === id2) return;
+  const g1 = groups.find(x=>x.id===id1);
+  const g2 = groups.find(x=>x.id===id2);
+  if(g1 && g2) {
+    saveSnapshot();
+    const tempLabel = g1.label;
+    g1.label = g2.label;
+    g2.label = tempLabel;
+    
+    const tempColor = g1.color;
+    g1.color = g2.color;
+    g2.color = tempColor;
+
+    refreshGroupList();
+    render();
+    triggerAutosave();
+  }
+}
+
+function generateRandomLayout() {
+  const el = document.getElementById('random-group-count');
+  if(!el) return;
+  const totalGroups = parseInt(el.value);
+  if (isNaN(totalGroups) || totalGroups < 2 || totalGroups > 20) return;
+
+  saveSnapshot();
+
+  groups = groups.filter(g => g.id === GROUP1_ID);
+  const g1 = groups.find(g => g.id === GROUP1_ID);
+  if (g1) {
+    g1.label = 1;
+    g1.color = GCOLORS[0];
+  }
+  
+  let currentAngle = 0;
+  let gaps = [];
+  let sumGaps = 0;
+  for(let i=0; i<totalGroups; i++) {
+    let gap = (360 / totalGroups) + (Math.random() * (360 / totalGroups) - (180 / totalGroups));
+    gaps.push(gap);
+    sumGaps += gap;
+  }
+  const scale = 360 / sumGaps;
+  for(let i=1; i<totalGroups; i++) {
+    currentAngle += gaps[i-1] * scale;
+    const g = {
+      id: nextGroupId++,
+      label: i + 1,
+      color: GCOLORS[i % GCOLORS.length],
+      rotation: currentAngle % 360,
+      locked: false
+    };
+    groups.push(g);
+  }
+
+  shapes = shapes.filter(s => !s._isCopy);
+  const originShapes = shapes.filter(s => s.groupId === GROUP1_ID && s.points && s.points.length >= 2);
+  
+  originShapes.forEach(s => {
+    const groupIndex = Math.floor(Math.random() * totalGroups);
+    const targetGroupId = groups[groupIndex].id;
+    if (targetGroupId !== GROUP1_ID) {
+      makeCopy(s, targetGroupId);
+    }
+  });
+
+  refreshGroupList();
+  render();
+  triggerAutosave();
+}
+
+function setLabelOffset(gId, axis, val) {
+  const targetId = (typeof activeDrawGroupId !== 'undefined' && activeDrawGroupId === gId) ? 'g1_label' : 'g'+gId+'_label';
+  if(!labels[targetId]) labels[targetId] = {ox:4, oy:-4};
+  labels[targetId][axis] = parseFloat(val) || 0;
+  render();
+  if(typeof triggerAutosave === 'function') triggerAutosave();
 }

@@ -184,6 +184,7 @@ function renderCanvasMode(sc) {
 
 function renderGroupMarkers(sc){
   groups.forEach(g=>{
+    const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
     // Marker: radially tall (6mm tall, 1mm wide at circle edge)
     const mRadHalf=3*sc;   // 6mm total radial height 편측3mm
     const mTangHalf=0.5*sc; // 1mm tangential width 편측0.5mm
@@ -198,11 +199,23 @@ function renderGroupMarkers(sc){
     ctx.beginPath();
     ctx.rect(-mTangHalf,edgeY-mRadHalf,mTangHalf*2,mRadHalf*2);
     ctx.fill();ctx.stroke();
-    // Label to the right
-    ctx.fillStyle='#fff';
-    ctx.font=`bold ${Math.max(9,3.5*sc)}px sans-serif`;
+    
+    // Group label to the right, slightly inside the circle
+    const labelSize = parseFloat(document.getElementById('label-size')?document.getElementById('label-size').value:4) || 4;
+    ctx.fillStyle=g.color;
+    ctx.font=`bold ${Math.max(9, labelSize*sc)}px sans-serif`;
     ctx.textAlign='left';ctx.textBaseline='middle';
-    ctx.fillText(g.label,mTangHalf+4,edgeY);
+    ctx.fillText(g.label, mTangHalf+4, edgeY + 6*sc);
+    
+    // Shape count to the left
+    if(document.getElementById('export-count') && document.getElementById('export-count').value === 'no') {
+      // do not draw
+    } else {
+      ctx.textAlign='right';
+      ctx.fillStyle='#aaa';
+      ctx.fillText(count, -mTangHalf-4, edgeY + 6*sc);
+    }
+    
     ctx.restore();
   });
 }

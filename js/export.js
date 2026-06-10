@@ -7,7 +7,7 @@ async function saveProject(){
       const options = { mode: 'readwrite' };
       if ((await currentFileHandle.queryPermission(options)) !== 'granted') {
         if ((await currentFileHandle.requestPermission(options)) !== 'granted') {
-          alert('저장 권한이 거부되었습니다.');
+          alert(t('save_denied'));
           return;
         }
       }
@@ -15,7 +15,7 @@ async function saveProject(){
       await writable.write(jsonStr);
       await writable.close();
     } catch (err) {
-      console.warn('기존 파일 덮어쓰기 실패, 다른 이름으로 저장을 시도합니다.', err);
+      console.warn(t('save_fallback'), err);
       await saveProjectAs();
     }
   } else {
@@ -44,7 +44,7 @@ async function saveProjectAs(){
       await writable.close();
     } catch (err) {
       if (err.name !== 'AbortError') {
-        alert('저장 오류: ' + err.message);
+        alert(t('save_err') + err.message);
       }
     }
   } else {
@@ -98,7 +98,7 @@ async function loadProject(){
       applyProjectData(d);
     } catch (err) {
       if (err.name !== 'AbortError') {
-        alert('불러오기 오류: ' + err.message);
+        alert(t('load_err') + err.message);
       }
     }
   } else {
@@ -114,14 +114,17 @@ function onProjectLoaded(e){
     try{
       const d=JSON.parse(ev.target.result);
       applyProjectData(d);
-    }catch(err){alert('파일 오류: '+err.message);}
+    }catch(err){alert(t('file_err') + err.message);}
   };
   rd.readAsText(file);e.target.value='';
 }
 
 function showExportModal(){document.getElementById('export-modal').style.display='flex';}
 
-function renderOffscreen(mmScale){
+function renderOffscreen(mmScale, exportTarget = 'all') {
+  const exportFont = document.getElementById('export-font') ? document.getElementById('export-font').value : 'vector';
+  const exportCount = document.getElementById('export-count') ? document.getElementById('export-count').value : 'yes';
+
   const oc=document.createElement('canvas');
   oc.width=Math.round(paperGuide.w*mmScale);oc.height=Math.round(paperGuide.h*mmScale);
   const oc2=oc.getContext('2d');
@@ -137,68 +140,180 @@ function renderOffscreen(mmScale){
      oc2.drawImage(img.img, -img.w/2 * mmScale, -img.h/2 * mmScale, img.w * mmScale, img.h * mmScale);
      oc2.restore();
   });
-  shapes.forEach(s=>{
-    if(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))return;
-    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-    oc2.save();
-    if(g&&g.rotation!==0){oc2.translate(circle.cx*mmScale,circle.cy*mmScale);oc2.rotate(g.rotation*Math.PI/180);oc2.translate(-circle.cx*mmScale,-circle.cy*mmScale);}
-    
-    const color = g ? g.color : '#000';
-    const {pts, closed} = getPolyline(s);
-    if(pts.length>=2){
-      oc2.beginPath();
-      oc2.moveTo(pts[0].x * mmScale, pts[0].y * mmScale);
-      pts.slice(1).forEach(p => oc2.lineTo(p.x * mmScale, p.y * mmScale));
-      oc2.lineJoin = 'miter';
-      oc2.lineCap = 'round';
-      if(closed){
-        oc2.closePath();
-        oc2.fillStyle = color;
-        oc2.fill();
-        oc2.strokeStyle = color;
-        oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
-        oc2.stroke();
-      } else {
-        oc2.strokeStyle = color;
-        oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
-        oc2.stroke();
+  
+  if (exportTarget === 'all' || exportTarget === 'shapes') {
+    shapes.forEach(s=>{
+      if(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))return;
+      const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+      oc2.save();
+      if(g&&g.rotation!==0){oc2.translate(circle.cx*mmScale,circle.cy*mmScale);oc2.rotate(g.rotation*Math.PI/180);oc2.translate(-circle.cx*mmScale,-circle.cy*mmScale);}
+      
+      const color = g ? g.color : '#000';
+      const {pts, closed} = getPolyline(s);
+      if(pts.length>=2){
+        oc2.beginPath();
+        oc2.moveTo(pts[0].x * mmScale, pts[0].y * mmScale);
+        pts.slice(1).forEach(p => oc2.lineTo(p.x * mmScale, p.y * mmScale));
+        oc2.lineJoin = 'miter';
+        oc2.lineCap = 'round';
+        if(closed){
+          oc2.closePath();
+          oc2.fillStyle = color;
+          oc2.fill();
+          oc2.strokeStyle = color;
+          oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+          oc2.stroke();
+        } else {
+          oc2.strokeStyle = color;
+          oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+          oc2.stroke();
+        }
       }
-    }
-    oc2.restore();
-  });
+      oc2.restore();
+    });
+  }
   
-  // 가이드 원 오프스크린 렌더링 추가
-  const circleCx = circle.cx * mmScale, circleCy = circle.cy * mmScale, circleR = circle.r * mmScale;
-  oc2.save();
-  oc2.strokeStyle = '#4488ffaa'; oc2.lineWidth = 0.5 * mmScale;
-  oc2.setLineDash([5 * mmScale, 5 * mmScale]);
-  oc2.beginPath(); oc2.arc(circleCx, circleCy, circleR, 0, Math.PI*2); oc2.stroke();
-  oc2.setLineDash([]);
-  oc2.fillStyle = '#4488ffcc'; oc2.beginPath(); oc2.arc(circleCx, circleCy, 2.5 * mmScale, 0, Math.PI*2); oc2.fill();
-  oc2.restore();
-  
-  // 그룹 마커 핸들 오프스크린 렌더링 추가
-  groups.forEach(g => {
-    const mRadHalf = 3 * mmScale;
-    const mTangHalf = 0.5 * mmScale;
+  if (exportTarget === 'all' || exportTarget === 'labels') {
+    const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+    shapes.forEach(s => {
+      if(!s.groupId)return;
+      if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
+      const g=groups.find(x=>x.id===s.groupId);if(!g)return;
+      const targetId = s._isCopy ? s._origId : s.id;
+      const lbl=labels[targetId]||{ox:4,oy:-4};
+      const ctr = shapeCenter(s);
+      
+      const lx = ctr.x + lbl.ox;
+      const ly = ctr.y + lbl.oy;
+      
+      const strStr = String(g.label);
+      const letterSpacing = 0.8;
+      const totalWidth = (strStr.length - 1) * letterSpacing;
+      const startX = -totalWidth / 2;
+      const hw = Math.max(0.2, labelSize * 0.08); // 레이블 굵기
+      
+      oc2.fillStyle = g.color;
+      
+      for(let i=0; i<strStr.length; i++) {
+        const char = strStr[i];
+        const offsetX = startX + i * letterSpacing;
+        
+        if (exportFont === '7seg' && digitSegs[char]) {
+          digitSegs[char].forEach(seg => {
+            const p1 = { x: lx + (seg[0][0] + offsetX) * labelSize, y: ly + seg[0][1] * labelSize };
+            const p2 = { x: lx + (seg[1][0] + offsetX) * labelSize, y: ly + seg[1][1] * labelSize };
+            const rp1 = g.rotation !== 0 ? rotAround(p1, circle.cx, circle.cy, g.rotation) : p1;
+            const rp2 = g.rotation !== 0 ? rotAround(p2, circle.cx, circle.cy, g.rotation) : p2;
+            const dStr = getHexSegmentD(rp1, rp2, hw, mmScale);
+            if (dStr) {
+              const p2d = new Path2D(dStr);
+              oc2.fill(p2d);
+            }
+          });
+        } else if (exportFont === 'vector') {
+          // 'vector'는 PDF/PNG 특성상 실제 폰트 사용
+          oc2.save();
+          oc2.translate(circle.cx*mmScale, circle.cy*mmScale);
+          if(g.rotation !== 0) oc2.rotate(g.rotation*Math.PI/180);
+          oc2.translate(-circle.cx*mmScale, -circle.cy*mmScale);
+          
+          oc2.font = `bold ${labelSize * 1.5 * mmScale}px sans-serif`;
+          oc2.textAlign = 'center';
+          oc2.textBaseline = 'middle';
+          oc2.fillText(char, (lx + offsetX * labelSize) * mmScale, ly * mmScale);
+          oc2.restore();
+        }
+      }
+    });
+
+    // 가이드 원 오프스크린 렌더링
+    const circleCx = circle.cx * mmScale, circleCy = circle.cy * mmScale, circleR = circle.r * mmScale;
     oc2.save();
-    oc2.translate(circle.cx * mmScale, circle.cy * mmScale);
-    oc2.rotate(g.rotation * Math.PI / 180);
-    const edgeY = -(circle.r * mmScale);
-    oc2.fillStyle = g.color + 'bb';
-    oc2.strokeStyle = g.color;
-    oc2.lineWidth = 1 * mmScale;
-    oc2.beginPath();
-    oc2.rect(-mTangHalf, edgeY - mRadHalf, mTangHalf * 2, mRadHalf * 2);
-    oc2.fill(); oc2.stroke();
-    
-    // Label to the right
-    oc2.fillStyle = '#fff';
-    oc2.font = `bold ${3.5 * mmScale}px sans-serif`;
-    oc2.textAlign = 'left'; oc2.textBaseline = 'middle';
-    oc2.fillText(g.label, mTangHalf + 4 * mmScale, edgeY);
+    oc2.strokeStyle = '#4488ffaa'; oc2.lineWidth = 0.5 * mmScale;
+    oc2.setLineDash([5 * mmScale, 5 * mmScale]);
+    oc2.beginPath(); oc2.arc(circleCx, circleCy, circleR, 0, Math.PI*2); oc2.stroke();
+    oc2.setLineDash([]);
+    oc2.fillStyle = '#4488ffcc'; oc2.beginPath(); oc2.arc(circleCx, circleCy, 2.5 * mmScale, 0, Math.PI*2); oc2.fill();
     oc2.restore();
-  });
+    
+    // 그룹 마커 핸들 오프스크린 렌더링
+    groups.forEach(g => {
+      const mRadHalf = 3 * mmScale;
+      const mTangHalf = 0.5 * mmScale;
+      oc2.save();
+      oc2.translate(circle.cx * mmScale, circle.cy * mmScale);
+      oc2.rotate(g.rotation * Math.PI / 180);
+      const edgeY = -(circle.r * mmScale);
+      oc2.fillStyle = g.color + 'bb';
+      oc2.strokeStyle = g.color;
+      oc2.lineWidth = 1 * mmScale;
+      oc2.beginPath();
+      oc2.rect(-mTangHalf, edgeY - mRadHalf, mTangHalf * 2, mRadHalf * 2);
+      oc2.fill(); oc2.stroke();
+      oc2.restore();
+      
+      const strStr = String(g.label);
+      const labelSize = parseFloat(document.getElementById('label-size')?document.getElementById('label-size').value:4) || 4;
+      const mLabelSize = labelSize;
+      const letterSpacing = 0.8;
+      const totalWidth = (strStr.length - 1) * letterSpacing;
+      
+      const ly = circle.cy + (-circle.r) + 6;
+      const mHw = Math.max(0.2, mLabelSize * 0.08);
+      const mRot = g.rotation;
+
+      const drawText = (textStr, cx, cy) => {
+        const tw = (textStr.length - 1) * letterSpacing;
+        const sX = cx - (tw * mLabelSize) / 2;
+        oc2.fillStyle = g.color;
+        
+        for(let i=0; i<textStr.length; i++) {
+          const char = textStr[i];
+          const offsetX = (sX - cx)/mLabelSize + i * letterSpacing;
+          
+          if (exportFont === '7seg' && digitSegs[char]) {
+            digitSegs[char].forEach(seg => {
+              const p1 = { x: cx + (seg[0][0] + offsetX) * mLabelSize, y: cy + seg[0][1] * mLabelSize };
+              const p2 = { x: cx + (seg[1][0] + offsetX) * mLabelSize, y: cy + seg[1][1] * mLabelSize };
+              const p1Rot = rotAround(p1, circle.cx, circle.cy, mRot);
+              const p2Rot = rotAround(p2, circle.cx, circle.cy, mRot);
+              const dText = getHexSegmentD(p1Rot, p2Rot, mHw, mmScale);
+              if (dText) {
+                const p2d = new Path2D(dText);
+                oc2.fill(p2d);
+              }
+            });
+          } else if (exportFont === 'vector') {
+            oc2.save();
+            oc2.translate(circle.cx*mmScale, circle.cy*mmScale);
+            if(mRot !== 0) oc2.rotate(mRot*Math.PI/180);
+            oc2.translate(-circle.cx*mmScale, -circle.cy*mmScale);
+            
+            oc2.font = `bold ${mLabelSize * 1.5 * mmScale}px sans-serif`;
+            oc2.textAlign = 'center';
+            oc2.textBaseline = 'middle';
+            oc2.fillText(char, (cx + offsetX * mLabelSize) * mmScale, cy * mmScale);
+            oc2.restore();
+          }
+        }
+      };
+
+      // Right side: Group Number
+      const lxCenter = circle.cx + 4.5 + (totalWidth * mLabelSize) / 2;
+      drawText(strStr, lxCenter, ly);
+      
+      // Left side: Shape Count
+      if (exportCount === 'yes') {
+        const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+        const countStr = String(count);
+        const ctw = (countStr.length - 1) * letterSpacing;
+        const cLxCenter = circle.cx - 4.5 - (ctw * mLabelSize) / 2;
+        oc2.globalAlpha = 0.6;
+        drawText(countStr, cLxCenter, ly);
+        oc2.globalAlpha = 1.0;
+      }
+    });
+  }
 
   oc2.restore();
   return oc;
@@ -253,7 +368,7 @@ for(let k in rawDigitSegs) {
     const dy = seg[1][1] - seg[0][1];
     const len = Math.hypot(dx, dy);
     if(len < 1e-4) return seg;
-    const shrink = 0.12; // 0.1로 늘리되 두께 고려하여 조금 더 넉넉하게 0.12로 적용
+    const shrink = 0.015;
     const nx = dx/len * shrink;
     const ny = dy/len * shrink;
     return [
@@ -263,9 +378,45 @@ for(let k in rawDigitSegs) {
   });
 }
 
-function svgNativeOffsetPathD(s, rot, cx, cy) {
-  const SVG_SCALE = 96 / 25.4;
-  const f = v => (v * SVG_SCALE).toFixed(3);
+function getHexSegmentD(p0, p1, hw, customScale = 96 / 25.4) {
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-5) return null;
+  const nx = -dy/len * hw, ny = dx/len * hw;
+  const px = dx/len, py = dy/len;
+  
+  const f = v => (v * customScale).toFixed(3);
+  
+  const tipL = hw * 0.9; 
+  const gap = 0; 
+  const p0x = p0.x + px*gap, p0y = p0.y + py*gap;
+  const p1x = p1.x - px*gap, p1y = p1.y - py*gap;
+  
+  const t0x = p0x, t0y = p0y;
+  const c0tx = p0x + px*tipL + nx, c0ty = p0y + py*tipL + ny;
+  const c1tx = p1x - px*tipL + nx, c1ty = p1y - py*tipL + ny;
+  const t1x = p1x, t1y = p1y;
+  const c1bx = p1x - px*tipL - nx, c1by = p1y - py*tipL - ny;
+  const c0bx = p0x + px*tipL - nx, c0by = p0y + py*tipL - ny;
+
+  return `M ${f(t0x)} ${f(t0y)} L ${f(c0tx)} ${f(c0ty)} L ${f(c1tx)} ${f(c1ty)} L ${f(t1x)} ${f(t1y)} L ${f(c1bx)} ${f(c1by)} L ${f(c0bx)} ${f(c0by)} Z`;
+}
+
+const vectorDigits = {
+  '0': [{ closed: true, points: [ {x:0, y:-0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0, inT:{x:0,y:-0.3}, outT:{x:0,y:0.3}}, {x:0, y:0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0, inT:{x:0,y:0.3}, outT:{x:0,y:-0.3}} ]}],
+  '1': [{ closed: false, points: [ {x:0, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0, y:0.5, inT:{x:0,y:0}, outT:{x:0,y:0}} ]}],
+  '2': [{ closed: false, points: [ {x:-0.3, y:-0.3, inT:{x:0,y:0}, outT:{x:0,y:-0.2}}, {x:0, y:-0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.3, inT:{x:0,y:-0.2}, outT:{x:-0.1,y:0.3}}, {x:-0.3, y:0.5, inT:{x:0.1,y:-0.3}, outT:{x:0,y:0}}, {x:0.3, y:0.5, inT:{x:0,y:0}, outT:{x:0,y:0}} ]}],
+  '3': [{ closed: false, points: [ {x:-0.3, y:-0.3, inT:{x:0,y:0}, outT:{x:0,y:-0.2}}, {x:0, y:-0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.25, inT:{x:0,y:-0.2}, outT:{x:0,y:0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.2}}, {x:0, y:0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.3, inT:{x:0,y:0.2}, outT:{x:0,y:0}} ]}],
+  '4': [{ closed: false, points: [ {x:0.2, y:0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0.2, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:-0.3, y:0.1, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0.3, y:0.1, inT:{x:0,y:0}, outT:{x:0,y:0}} ]}],
+  '5': [{ closed: false, points: [ {x:0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:-0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:-0.3, y:0, inT:{x:0,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.15, inT:{x:0,y:-0.1}, outT:{x:0,y:0.2}}, {x:0, y:0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.3, inT:{x:0,y:0.2}, outT:{x:0,y:0}} ]}],
+  '6': [{ closed: false, points: [ {x:0.2, y:-0.4, inT:{x:0,y:0}, outT:{x:-0.1,y:-0.1}}, {x:-0.3, y:0.1, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.15, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:0, y:-0.1, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.1, inT:{x:0,y:-0.1}, outT:{x:0,y:0}} ]}],
+  '7': [{ closed: false, points: [ {x:-0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0, y:0.5, inT:{x:0,y:0}, outT:{x:0,y:0}} ]}],
+  '8': [{ closed: true, points: [ {x:0, y:-0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.15}}, {x:0, y:0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.25, inT:{x:0,y:0.15}, outT:{x:0,y:-0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.25, inT:{x:0,y:0.15}, outT:{x:0,y:-0.15}} ]}],
+  '9': [{ closed: false, points: [ {x:-0.2, y:0.4, inT:{x:0,y:0}, outT:{x:0.1,y:0.1}}, {x:0.3, y:-0.1, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:0, y:-0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.15, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.1, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.1, inT:{x:0,y:0.1}, outT:{x:0,y:0}} ]}]
+};
+
+function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
+  const f = v => (v * customScale).toFixed(3);
   const hw = (s.strokeWidth || strokeWidth) / 2;
   const closed = s.closed === true;
   
@@ -409,6 +560,12 @@ function exportSVG(){
   const targetSel = document.getElementById('export-target');
   const exportTarget = targetSel ? targetSel.value : 'all'; // 'all', 'shapes', 'labels'
   
+  const fontSel = document.getElementById('export-font');
+  const exportFont = fontSel ? fontSel.value : 'vector';
+  
+  const countSel = document.getElementById('export-count');
+  const exportCount = countSel ? countSel.value : 'yes';
+  
   const bounds = getGlobalBounds();
   
   const SVG_SCALE = 96 / 25.4;
@@ -455,14 +612,27 @@ function exportSVG(){
       
       for(let i=0; i<strStr.length; i++) {
         const char = strStr[i];
-        if (digitSegs[char]) {
-          const offsetX = startX + i * letterSpacing;
+        const offsetX = startX + i * letterSpacing;
+        
+        if (exportFont === '7seg' && digitSegs[char]) {
           digitSegs[char].forEach(seg => {
             const p1 = { x: lx + (seg[0][0] + offsetX) * labelSize, y: ly + seg[0][1] * labelSize };
             const p2 = { x: lx + (seg[1][0] + offsetX) * labelSize, y: ly + seg[1][1] * labelSize };
             const rp1 = g.rotation !== 0 ? rotAround(p1, circle.cx, circle.cy, g.rotation) : p1;
             const rp2 = g.rotation !== 0 ? rotAround(p2, circle.cx, circle.cy, g.rotation) : p2;
-            const d = getSquareLineD(rp1, rp2, hw);
+            const d = getHexSegmentD(rp1, rp2, hw);
+            if (d) svg += `  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
+          });
+        } else if (exportFont === 'vector' && vectorDigits[char]) {
+          vectorDigits[char].forEach(stroke => {
+            const scaledPoints = stroke.points.map(p => ({
+              x: lx + (p.x + offsetX) * labelSize,
+              y: ly + p.y * labelSize,
+              inT: { x: p.inT.x * labelSize, y: p.inT.y * labelSize },
+              outT: { x: p.outT.x * labelSize, y: p.outT.y * labelSize }
+            }));
+            const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: hw * 2, points: scaledPoints };
+            const d = svgNativeOffsetPathD(mockShape, g.rotation, circle.cx, circle.cy);
             if (d) svg += `  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
           });
         }
@@ -484,26 +654,53 @@ function exportSVG(){
       if(dLine) svg += `  <path d="${dLine}" fill="${g.color}" stroke="none" fill-opacity="0.73" />\n`;
       
       const strStr = String(g.label);
-      const mLabelSize = 3.5;
+      const mLabelSize = parseFloat(document.getElementById('label-size')?document.getElementById('label-size').value:4) || 4;
       const letterSpacing = 0.8;
       const totalWidth = (strStr.length - 1) * letterSpacing;
       const lxCenter = circle.cx + 4.5 + (totalWidth * mLabelSize) / 2;
-      const ly = circle.cy + edgeY;
-      const mHw = 0.25;
+      const ly = circle.cy + edgeY + 6;
+      const mHw = Math.max(0.2, mLabelSize * 0.08);
       
-      for(let i=0; i<strStr.length; i++) {
-        const char = strStr[i];
-        if (digitSegs[char]) {
-          const offsetX = -totalWidth/2 + i * letterSpacing;
-          digitSegs[char].forEach(seg => {
-            const p1 = { x: lxCenter + (seg[0][0] + offsetX) * mLabelSize, y: ly + seg[0][1] * mLabelSize };
-            const p2 = { x: lxCenter + (seg[1][0] + offsetX) * mLabelSize, y: ly + seg[1][1] * mLabelSize };
-            const p1Rot = rotAround(p1, circle.cx, circle.cy, mRot);
-            const p2Rot = rotAround(p2, circle.cx, circle.cy, mRot);
-            const dText = getSquareLineD(p1Rot, p2Rot, mHw);
-            if (dText) svg += `  <path d="${dText}" fill="${g.color}" stroke="none" />\n`;
-          });
+      const drawText = (textStr, cx, cy, opac) => {
+        const tw = (textStr.length - 1) * letterSpacing;
+        const sX = cx - (tw * mLabelSize) / 2;
+        for(let i=0; i<textStr.length; i++) {
+          const char = textStr[i];
+          const offsetX = (sX - cx)/mLabelSize + i * letterSpacing;
+          if (exportFont === '7seg' && digitSegs[char]) {
+            digitSegs[char].forEach(seg => {
+              const p1 = { x: cx + (seg[0][0] + offsetX) * mLabelSize, y: cy + seg[0][1] * mLabelSize };
+              const p2 = { x: cx + (seg[1][0] + offsetX) * mLabelSize, y: cy + seg[1][1] * mLabelSize };
+              const p1Rot = rotAround(p1, circle.cx, circle.cy, mRot);
+              const p2Rot = rotAround(p2, circle.cx, circle.cy, mRot);
+              const dText = getHexSegmentD(p1Rot, p2Rot, mHw);
+              if (dText) svg += `  <path d="${dText}" fill="${g.color}" stroke="none" fill-opacity="${opac}" />\n`;
+            });
+          } else if (exportFont === 'vector' && vectorDigits[char]) {
+            vectorDigits[char].forEach(stroke => {
+              const scaledPoints = stroke.points.map(p => ({
+                x: cx + (p.x + offsetX) * mLabelSize,
+                y: cy + p.y * mLabelSize,
+                inT: { x: p.inT.x * mLabelSize, y: p.inT.y * mLabelSize },
+                outT: { x: p.outT.x * mLabelSize, y: p.outT.y * mLabelSize }
+              }));
+              const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: mHw * 2, points: scaledPoints };
+              const dText = svgNativeOffsetPathD(mockShape, mRot, circle.cx, circle.cy);
+              if (dText) svg += `  <path d="${dText}" fill="${g.color}" stroke="none" fill-opacity="${opac}" />\n`;
+            });
+          }
         }
+      };
+
+      drawText(strStr, lxCenter, ly, 1);
+      
+      // Shape Count -> Left
+      if (exportCount === 'yes') {
+        const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+        const countStr = String(count);
+        const ctw = (countStr.length - 1) * letterSpacing;
+        const cLxCenter = circle.cx - 4.5 - (ctw * mLabelSize) / 2;
+        drawText(countStr, cLxCenter, ly, 0.6);
       }
     });
   }
@@ -578,25 +775,263 @@ function svgOffsetPathD(pts,closed,hw){
   }
 }
 
+function exportPNG(){
+  document.getElementById('export-modal').style.display='none';
+  const targetSel = document.getElementById('export-target');
+  const exportTarget = targetSel ? targetSel.value : 'all';
+  const filename = exportTarget === 'shapes' ? 'rotadraw_shapes.png' : (exportTarget === 'labels' ? 'rotadraw_labels.png' : 'rotadraw.png');
+  
+  renderOffscreen(EXPORT_MM, exportTarget).toBlob(b=>{
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=filename;a.click();
+  });
+}
+
 function exportDXF(){
   document.getElementById('export-modal').style.display='none';
+  const targetSel = document.getElementById('export-target');
+  const exportTarget = targetSel ? targetSel.value : 'all';
+  
+  const fontSel = document.getElementById('export-font');
+  const exportFont = fontSel ? fontSel.value : 'vector';
+  
+  const countSel = document.getElementById('export-count');
+  const exportCount = countSel ? countSel.value : 'yes';
+  
   let dxf='0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
-  shapes.forEach(s=>{
-    if(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))return;
-    const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-    const{pts}=getPolyline(s);if(pts.length<2)return;
-    const rp=pts.map(p=>g?rotAround(p,circle.cx,circle.cy,g.rotation):p);
-    dxf+=`0\nLWPOLYLINE\n8\nG${s.groupId||0}\n70\n${isShapeClosed(s)?1:0}\n`;
-    rp.forEach(p=>{dxf+=`10\n${p.x.toFixed(4)}\n20\n${(-p.y).toFixed(4)}\n`;});
-  });
+  
+  const SVG_SCALE = 96 / 25.4;
+  
+  const writeLine = (layer, x1, y1, x2, y2) => {
+    dxf += `0\nLINE\n8\n${layer}\n`;
+    dxf += `10\n${x1.toFixed(4)}\n20\n${(-y1).toFixed(4)}\n`;
+    dxf += `11\n${x2.toFixed(4)}\n21\n${(-y2).toFixed(4)}\n`;
+  };
+  
+  const writeBezier = (layer, x1, y1, cx1, cy1, cx2, cy2, x2, y2) => {
+    dxf += `0\nSPLINE\n8\n${layer}\n100\nAcDbEntity\n100\nAcDbSpline\n`;
+    dxf += `70\n8\n71\n3\n72\n8\n73\n4\n74\n0\n`;
+    dxf += `40\n0\n40\n0\n40\n0\n40\n0\n40\n1\n40\n1\n40\n1\n40\n1\n`; 
+    dxf += `10\n${x1.toFixed(4)}\n20\n${(-y1).toFixed(4)}\n`;
+    dxf += `10\n${cx1.toFixed(4)}\n20\n${(-cy1).toFixed(4)}\n`;
+    dxf += `10\n${cx2.toFixed(4)}\n20\n${(-cy2).toFixed(4)}\n`;
+    dxf += `10\n${x2.toFixed(4)}\n20\n${(-y2).toFixed(4)}\n`;
+  };
+
+  const writeCircle = (layer, cx, cy, r) => {
+    dxf += `0\nCIRCLE\n8\n${layer}\n`;
+    dxf += `10\n${(cx*SVG_SCALE).toFixed(4)}\n20\n${(-cy*SVG_SCALE).toFixed(4)}\n`;
+    dxf += `40\n${(r*SVG_SCALE).toFixed(4)}\n`;
+  };
+
+  const processSvgPath = (d, layer) => {
+    const tokens = d.replace(/,/g, ' ').trim().split(/\s+/);
+    let cx = 0, cy = 0;
+    let startX = 0, startY = 0;
+    let i = 0;
+    while(i < tokens.length) {
+      const cmd = tokens[i++];
+      if (cmd === 'M') {
+        cx = parseFloat(tokens[i++]);
+        cy = parseFloat(tokens[i++]);
+        startX = cx; startY = cy;
+      } else if (cmd === 'L') {
+        const nx = parseFloat(tokens[i++]);
+        const ny = parseFloat(tokens[i++]);
+        writeLine(layer, cx, cy, nx, ny);
+        cx = nx; cy = ny;
+      } else if (cmd === 'C') {
+        const cx1 = parseFloat(tokens[i++]);
+        const cy1 = parseFloat(tokens[i++]);
+        const cx2 = parseFloat(tokens[i++]);
+        const cy2 = parseFloat(tokens[i++]);
+        const nx = parseFloat(tokens[i++]);
+        const ny = parseFloat(tokens[i++]);
+        writeBezier(layer, cx, cy, cx1, cy1, cx2, cy2, nx, ny);
+        cx = nx; cy = ny;
+      } else if (cmd === 'A') {
+        const rx = parseFloat(tokens[i++]);
+        const ry = parseFloat(tokens[i++]);
+        const xAxisRot = parseFloat(tokens[i++]);
+        const largeArc = parseFloat(tokens[i++]);
+        const sweep = parseFloat(tokens[i++]);
+        const nx = parseFloat(tokens[i++]);
+        const ny = parseFloat(tokens[i++]);
+        
+        const mx = (cx + nx) / 2;
+        const my = (cy + ny) / 2;
+        const dx = nx - cx;
+        const dy = ny - cy;
+        const len = Math.hypot(dx, dy);
+        
+        if (len > 1e-4) {
+          const perpX = sweep === 0 ? -dy/len * rx : dy/len * rx;
+          const perpY = sweep === 0 ? dx/len * rx : -dx/len * rx;
+          
+          const midPointX = mx + perpX;
+          const midPointY = my + perpY;
+          
+          const kappa = 0.552284749831;
+          const c1x = cx + perpX * kappa;
+          const c1y = cy + perpY * kappa;
+          const c2x = midPointX - (dx/2) * kappa;
+          const c2y = midPointY - (dy/2) * kappa;
+          writeBezier(layer, cx, cy, c1x, c1y, c2x, c2y, midPointX, midPointY);
+          
+          const c3x = midPointX + (dx/2) * kappa;
+          const c3y = midPointY + (dy/2) * kappa;
+          const c4x = nx + perpX * kappa;
+          const c4y = ny + perpY * kappa;
+          writeBezier(layer, midPointX, midPointY, c3x, c3y, c4x, c4y, nx, ny);
+        }
+        cx = nx; cy = ny;
+      } else if (cmd === 'Z') {
+        if (Math.hypot(cx - startX, cy - startY) > 1e-4) {
+          writeLine(layer, cx, cy, startX, startY);
+        }
+        cx = startX; cy = startY;
+      }
+    }
+  };
+
+  if (exportTarget === 'all' || exportTarget === 'shapes') {
+    groups.forEach(g=>{
+      shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
+        if(s.points.length >= 2){
+          const d = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          if(d){
+            processSvgPath(d, `G${g.id}_Shapes`);
+          }
+        }
+      });
+    });
+  }
+
+  if (exportTarget === 'all' || exportTarget === 'labels') {
+    const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+    shapes.forEach(s => {
+      if(!s.groupId)return;
+      if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
+      const g=groups.find(x=>x.id===s.groupId);if(!g)return;
+      const targetId = s._isCopy ? s._origId : s.id;
+      const lbl=labels[targetId]||{ox:4,oy:-4};
+      const ctr = shapeCenter(s);
+      
+      const lx = ctr.x + lbl.ox;
+      const ly = ctr.y + lbl.oy;
+      
+      const strStr = String(g.label);
+      const letterSpacing = 0.8;
+      const totalWidth = (strStr.length - 1) * letterSpacing;
+      const startX = -totalWidth / 2;
+      const hw = Math.max(0.2, labelSize * 0.08);
+      
+      for(let i=0; i<strStr.length; i++) {
+        const char = strStr[i];
+        const offsetX = startX + i * letterSpacing;
+        
+        if (exportFont === '7seg' && digitSegs[char]) {
+          digitSegs[char].forEach(seg => {
+            const p1 = { x: lx + (seg[0][0] + offsetX) * labelSize, y: ly + seg[0][1] * labelSize };
+            const p2 = { x: lx + (seg[1][0] + offsetX) * labelSize, y: ly + seg[1][1] * labelSize };
+            const rp1 = g.rotation !== 0 ? rotAround(p1, circle.cx, circle.cy, g.rotation) : p1;
+            const rp2 = g.rotation !== 0 ? rotAround(p2, circle.cx, circle.cy, g.rotation) : p2;
+            const d = getHexSegmentD(rp1, rp2, hw);
+            if (d) processSvgPath(d, `G${g.id}_Labels`);
+          });
+        } else if (exportFont === 'vector' && vectorDigits[char]) {
+          vectorDigits[char].forEach(stroke => {
+            const scaledPoints = stroke.points.map(p => ({
+              x: lx + (p.x + offsetX) * labelSize,
+              y: ly + p.y * labelSize,
+              inT: { x: p.inT.x * labelSize, y: p.inT.y * labelSize },
+              outT: { x: p.outT.x * labelSize, y: p.outT.y * labelSize }
+            }));
+            const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: hw * 2, points: scaledPoints };
+            const d = svgNativeOffsetPathD(mockShape, g.rotation, circle.cx, circle.cy);
+            if (d) processSvgPath(d, `G${g.id}_Labels`);
+          });
+        }
+      }
+    });
+    
+    // 가이드 원 DXF 추가 (Guide layer)
+    writeCircle('Guide', circle.cx, circle.cy, circle.r);
+    writeCircle('Guide', circle.cx, circle.cy, 2.5);
+    
+    // 그룹 마커 핸들 DXF 추가
+    groups.forEach(g => {
+      const edgeY = -circle.r;
+      const mRot = g.rotation;
+      
+      const rp1 = rotAround({x: circle.cx, y: circle.cy + edgeY - 3}, circle.cx, circle.cy, mRot);
+      const rp2 = rotAround({x: circle.cx, y: circle.cy + edgeY + 3}, circle.cx, circle.cy, mRot);
+      const dLine = getSquareLineD(rp1, rp2, 0.5);
+      if(dLine) processSvgPath(dLine, `G${g.id}_Labels`);
+      
+      const strStr = String(g.label);
+      const mLabelSize = 3.5;
+      const letterSpacing = 0.8;
+      const totalWidth = (strStr.length - 1) * letterSpacing;
+      const lxCenter = circle.cx + 4.5 + (totalWidth * mLabelSize) / 2;
+      const ly = circle.cy + edgeY + 6;
+      const mHw = 0.25;
+      
+      const drawText = (textStr, cx, cy) => {
+        const tw = (textStr.length - 1) * letterSpacing;
+        const sX = cx - (tw * mLabelSize) / 2;
+        for(let i=0; i<textStr.length; i++) {
+          const char = textStr[i];
+          const offsetX = (sX - cx)/mLabelSize + i * letterSpacing;
+          if (exportFont === '7seg' && digitSegs[char]) {
+            digitSegs[char].forEach(seg => {
+              const p1 = { x: cx + (seg[0][0] + offsetX) * mLabelSize, y: cy + seg[0][1] * mLabelSize };
+              const p2 = { x: cx + (seg[1][0] + offsetX) * mLabelSize, y: cy + seg[1][1] * mLabelSize };
+              const p1Rot = rotAround(p1, circle.cx, circle.cy, mRot);
+              const p2Rot = rotAround(p2, circle.cx, circle.cy, mRot);
+              const dText = getHexSegmentD(p1Rot, p2Rot, mHw);
+              if (dText) processSvgPath(dText, `G${g.id}_Labels`);
+            });
+          } else if (exportFont === 'vector' && vectorDigits[char]) {
+            vectorDigits[char].forEach(stroke => {
+              const scaledPoints = stroke.points.map(p => ({
+                x: cx + (p.x + offsetX) * mLabelSize,
+                y: cy + p.y * mLabelSize,
+                inT: { x: p.inT.x * mLabelSize, y: p.inT.y * mLabelSize },
+                outT: { x: p.outT.x * mLabelSize, y: p.outT.y * mLabelSize }
+              }));
+              const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: mHw * 2, points: scaledPoints };
+              const dText = svgNativeOffsetPathD(mockShape, mRot, circle.cx, circle.cy);
+              if (dText) processSvgPath(dText, `G${g.id}_Labels`);
+            });
+          }
+        }
+      };
+
+      drawText(strStr, lxCenter, ly);
+      
+      // Shape Count -> Left
+      if (exportCount === 'yes') {
+        const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+        const countStr = String(count);
+        const ctw = (countStr.length - 1) * letterSpacing;
+        const cLxCenter = circle.cx - 4.5 - (ctw * mLabelSize) / 2;
+        drawText(countStr, cLxCenter, ly);
+      }
+    });
+  }
+
   dxf+='0\nENDSEC\n0\nEOF\n';
+  const filename = exportTarget === 'shapes' ? 'rotadraw_shapes.dxf' : (exportTarget === 'labels' ? 'rotadraw_labels.dxf' : 'rotadraw.dxf');
   const blob=new Blob([dxf],{type:'application/dxf'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rotadraw.dxf';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
 }
 
 function exportPDF(){
   document.getElementById('export-modal').style.display='none';
-  const oc=renderOffscreen(EXPORT_MM);
+  const targetSel = document.getElementById('export-target');
+  const exportTarget = targetSel ? targetSel.value : 'all';
+  
+  const oc=renderOffscreen(EXPORT_MM, exportTarget);
   const url=oc.toDataURL('image/png');
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><style>@page{size:${paperGuide.w}mm ${paperGuide.h}mm;margin:0}body{margin:0}img{width:${paperGuide.w}mm;height:${paperGuide.h}mm}</style></head><body><img src="${url}"></body></html>`);
