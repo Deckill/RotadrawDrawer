@@ -93,7 +93,12 @@ const translations = {
     "ctx_curve": "곡선으로",
     "ctx_free": "자유 모드",
     "ctx_sym": "대칭 모드",
-    "ctx_del_pt": "점 삭제"
+    "ctx_del_pt": "점 삭제",
+
+    // License
+    "라이선스 및 크레딧": "라이선스 및 크레딧",
+    "무료 및 상업적 이용 허용": "무료 및 상업적 이용 허용 (Free for Commercial Use)",
+    "license_desc": "이 도구는 누구나 무료로 사용할 수 있으며, 이 도구를 사용하여 제작한 모든 결과물(디자인, 도면 등)은 개인적/상업적 목적에 제한 없이 자유롭게 사용할 수 있습니다."
   },
   en: {
     "캔버스": "Canvas",
@@ -180,7 +185,11 @@ const translations = {
     "ctx_curve": "To Curve",
     "ctx_free": "Free Mode",
     "ctx_sym": "Symmetric Mode",
-    "ctx_del_pt": "Delete Point"
+    "ctx_del_pt": "Delete Point",
+
+    "라이선스 및 크레딧": "License & Credit",
+    "무료 및 상업적 이용 허용": "Free for Commercial Use",
+    "license_desc": "This tool is free for everyone to use. All outputs (designs, drawings, etc.) created using this tool can be used freely for both personal and commercial purposes without restriction."
   },
   ja: {
     "캔버스": "キャンバス",
@@ -267,7 +276,11 @@ const translations = {
     "ctx_curve": "曲線に変換",
     "ctx_free": "自由モード",
     "ctx_sym": "対称モード",
-    "ctx_del_pt": "点を削除"
+    "ctx_del_pt": "点を削除",
+
+    "라이선스 및 크레딧": "ライセンスとクレジット",
+    "무료 및 상업적 이용 허용": "商用利用無料 (Free for Commercial Use)",
+    "license_desc": "このツールは誰でも無料で使用できます。このツールを使用して作成されたすべての成果物（デザイン、図面など）は、個人的および商業的な目的を問わず、制限なく自由に使用できます。"
   },
   zh: {
     "캔버스": "画布",
@@ -354,7 +367,11 @@ const translations = {
     "ctx_curve": "转为曲线",
     "ctx_free": "自由模式",
     "ctx_sym": "对称模式",
-    "ctx_del_pt": "删除点"
+    "ctx_del_pt": "删除点",
+
+    "라이선스 및 크레딧": "许可证与鸣谢",
+    "무료 및 상업적 이용 허용": "免费且允许商用 (Free for Commercial Use)",
+    "license_desc": "本工具完全免费。使用本工具生成的所有结果（设计、图纸等）均可自由用于个人或商业用途，不受任何限制。"
   }
 };
 
