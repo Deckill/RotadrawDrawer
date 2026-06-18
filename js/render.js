@@ -18,6 +18,23 @@ function render(){
   renderCircle(sc);
   if(currentMode==='arrange'||currentMode==='label')renderGroupMarkers(sc);
   if(currentMode==='label')renderLabels(sc);
+  if(currentMode==='arrange' && arrSelShapeId!==null) {
+    const arrSelS = shapes.find(s => s.id === arrSelShapeId);
+    if(arrSelS) {
+       const cc = getConnectedComponent(arrSelS._isCopy ? arrSelS._origId : arrSelS.id);
+       cc.forEach(id => {
+          const selS = shapes.find(s => (s.id === id || s._origId === id) && s.groupId === arrSelS.groupId);
+          if(selS) renderShapeGizmos(selS, sc);
+       });
+    }
+  }
+  if(currentMode==='draw' && selShapeId!==null) {
+    const cc = getConnectedComponent(selShapeId);
+    cc.forEach(id => {
+       const selS = shapes.find(s => s.id === id);
+       if(selS) renderShapeGizmos(selS, sc);
+    });
+  }
   if(currentMode==='draw'&&drawTool==='select'&&selShapeId!==null&&selPtIdx!==null)renderBezierHandles(sc);
   if(typeof updateImageSizeUI === 'function') updateImageSizeUI();
   // 트랜스폼 복구
@@ -31,7 +48,6 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
   const color=gColor(s);
   const isGhost=(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id));
   const isCopyInDrawMode=(currentMode==='draw'&&s._isCopy);
-  // draw 모드에서 isGhost는 무시 (원본을 진하게 보이게)
   const applyGhost = isGhost && currentMode !== 'draw';
   const shapeOpacity = (s.opacity !== undefined ? s.opacity : 1.0);
   drawCtx.save();
@@ -43,63 +59,54 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
   const baseAlpha = isPreview?0.55 : applyGhost?0.15 : isCopyInDrawMode?0.22 : 1.0;
   drawCtx.globalAlpha = baseAlpha * shapeOpacity;
   
-  const{pts,closed}=getPolyline(s);
-  if(pts.length>=2){
-    drawCtx.beginPath();
-    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-    drawCtx.lineJoin = 'miter';
-    drawCtx.lineCap = 'round';
-    if(closed){
-      drawCtx.closePath();
-      drawCtx.fillStyle=color;
-      drawCtx.fill();
+  const cc = getConnectedComponent(s.id);
+  const isRoot = (Math.min(...cc) === s.id);
+  
+  if (isCCClosed(s.id)) {
+    if (isRoot && s.isHollow !== true) {
+      const loop = getCCLoopPolyline(s.id);
+      if (loop && loop.pts.length >= 2) {
+        drawCtx.beginPath();
+        drawCtx.moveTo(loop.pts[0].x*sc, loop.pts[0].y*sc);
+        loop.pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+        drawCtx.closePath();
+        drawCtx.fillStyle=color;
+        drawCtx.fill();
+      }
+    }
+    const{pts}=getPolyline(s);
+    if(pts.length>=2){
+      drawCtx.beginPath();
+      drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+      if (s.closed) drawCtx.closePath();
       drawCtx.strokeStyle=color;
       drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.lineJoin = 'round';
+      drawCtx.lineCap = 'round';
       drawCtx.stroke();
-    } else {
+    }
+  } else {
+    const{pts,closed}=getPolyline(s);
+    if(pts.length>=2){
+      drawCtx.beginPath();
+      drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+      if(closed){
+        drawCtx.closePath();
+        if (s.isHollow !== true) {
+          drawCtx.fillStyle=color;
+          drawCtx.fill();
+        }
+      }
       drawCtx.strokeStyle=color;
       drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.lineJoin = 'round';
+      drawCtx.lineCap = 'round';
       drawCtx.stroke();
     }
   }
 
-  // Arrange highlight
-  if(currentMode==='arrange'&&s.id===arrSelShapeId&&pts.length>=2&&!customCtx){
-    drawCtx.save();
-    drawCtx.globalAlpha=0.3;
-    drawCtx.beginPath();
-    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-    if(closed){
-      drawCtx.closePath();
-      drawCtx.fillStyle='#fff';
-      drawCtx.fill();
-    }
-    drawCtx.restore();
-    
-    drawCtx.globalAlpha=0.9;drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1.5;
-    drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-    if(closed)drawCtx.closePath();
-    drawCtx.stroke();
-  }
-  // Draw mode vertex/edge drawing
-  if(currentMode==='draw'&&s.id===selShapeId&&!customCtx){
-    if(pts.length>=2){
-      drawCtx.strokeStyle='#4488ffaa';drawCtx.lineWidth=1;
-      drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
-      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
-      if(closed)drawCtx.closePath();
-      drawCtx.stroke();
-    }
-    s.points.forEach((p,idx)=>{
-      const isSel=idx===selPtIdx;
-      drawCtx.beginPath();drawCtx.arc(p.x*sc,p.y*sc,isSel?6:4,0,Math.PI*2);
-      drawCtx.fillStyle=isSel?'#ff007f':'#4488ff';drawCtx.fill();
-      drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1;drawCtx.stroke();
-    });
-  }
   drawCtx.restore();
 }
 
@@ -184,7 +191,7 @@ function renderCanvasMode(sc) {
 
 function renderGroupMarkers(sc){
   groups.forEach(g=>{
-    const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+    const count = getGroupShapeCount(g.id);
     // Marker: radially tall (6mm tall, 1mm wide at circle edge)
     const mRadHalf=3*sc;   // 6mm total radial height 편측3mm
     const mTangHalf=0.5*sc; // 1mm tangential width 편측0.5mm
@@ -205,7 +212,8 @@ function renderGroupMarkers(sc){
     ctx.fillStyle=g.color;
     ctx.font=`bold ${Math.max(9, labelSize*sc)}px sans-serif`;
     ctx.textAlign='left';ctx.textBaseline='middle';
-    ctx.fillText(g.label, mTangHalf+4, edgeY + 6*sc);
+    let arrLabelText = g.label;
+    ctx.fillText(arrLabelText, mTangHalf+4, edgeY + 6*sc);
     
     // Shape count to the left
     if(document.getElementById('export-count') && document.getElementById('export-count').value === 'no') {
@@ -222,13 +230,32 @@ function renderGroupMarkers(sc){
 
 function renderLabels(sc){
   const fs=parseFloat(document.getElementById('label-size').value)||4;
+  const renderedCCs = new Set();
   shapes.forEach(s=>{
     if(!s.groupId)return;
     if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
     const g=groups.find(x=>x.id===s.groupId);if(!g)return;
     const targetId = s._isCopy ? s._origId : s.id;
-    const lbl=labels[targetId]||{ox:4,oy:-4};
-    const ctr=shapeCenter(s);
+    
+    const cc = getConnectedComponent(targetId);
+    const ccKey = cc.join(',');
+    if (renderedCCs.has(ccKey)) return;
+    renderedCCs.add(ccKey);
+    
+    let sumX = 0, sumY = 0, count = 0;
+    cc.forEach(id => {
+       const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+       if (cs) {
+         const ctr = shapeCenter(cs);
+         sumX += ctr.x; sumY += ctr.y; count++;
+       }
+    });
+    if (count === 0) return;
+    const ctr = { x: sumX/count, y: sumY/count };
+    
+    const rootId = cc[0];
+    const lbl=labels[rootId]||{ox:4,oy:-4};
+    
     ctx.save();
     ctx.translate(circle.cx*sc,circle.cy*sc);
     ctx.rotate(g.rotation*Math.PI/180);
@@ -236,8 +263,29 @@ function renderLabels(sc){
     const lx=(ctr.x+lbl.ox)*sc,ly=(ctr.y+lbl.oy)*sc;
     ctx.font=`bold ${fs*sc}px sans-serif`;
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.strokeStyle='#000a';ctx.lineWidth=3;ctx.strokeText(g.label,lx,ly);
-    ctx.fillStyle=g.color;ctx.fillText(g.label,lx,ly);
+    
+    let labelText = g.label;
+    if (isCCClosed(targetId)) {
+      const rootShape = shapes.find(x => x.id === rootId);
+      if (rootShape) {
+        labelText = (rootShape.isHollow !== false ? '○' : '●') + labelText;
+      }
+    }
+    
+    ctx.strokeStyle='#000a';ctx.lineWidth=3;ctx.strokeText(labelText,lx,ly);
+    ctx.fillStyle=g.color;
+    ctx.fillText(labelText,lx,ly);
+    
+    if(currentMode==='label' && (s.id===selShapeId || cc.includes(selShapeId) || cc.includes(arrSelShapeId))){
+      const wPtX = ctr.x*sc;
+      const wPtY = ctr.y*sc;
+      ctx.strokeStyle='#888';ctx.lineWidth=1;
+      ctx.setLineDash([2,2]);
+      ctx.beginPath();ctx.moveTo(wPtX,wPtY);ctx.lineTo(lx,ly);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(lx,ly,4,0,Math.PI*2);
+      ctx.fillStyle='#ff0';ctx.fill();ctx.stroke();
+    }
     ctx.restore();
   });
 }
@@ -282,4 +330,57 @@ function renderBezierHandles(sc){
     ctx.setLineDash([]);
   }
   ctx.restore();
+}
+function renderShapeGizmos(s, sc) {
+  const drawCtx = ctx;
+  const {pts, closed} = getPolyline(s);
+  
+  const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
+  drawCtx.save();
+  if(g&&g.rotation!==0){
+    drawCtx.translate(circle.cx*sc,circle.cy*sc);
+    drawCtx.rotate(g.rotation*Math.PI/180);
+    drawCtx.translate(-circle.cx*sc,-circle.cy*sc);
+  }
+
+  // Arrange highlight
+  const cc = getConnectedComponent(s.id);
+  if(currentMode==='arrange'&&cc.includes(arrSelShapeId)&&pts.length>=2){
+    drawCtx.save();
+    drawCtx.globalAlpha=0.3;
+    drawCtx.beginPath();
+    drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    if(closed){
+      drawCtx.closePath();
+      drawCtx.fillStyle='#fff';
+      drawCtx.fill();
+    }
+    drawCtx.restore();
+    
+    drawCtx.globalAlpha=0.9;drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1.5;
+    drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+    pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+    if(closed)drawCtx.closePath();
+    drawCtx.stroke();
+  }
+  
+  // Draw mode vertex/edge drawing
+  if(currentMode==='draw'&&cc.includes(selShapeId)){
+    if(pts.length>=2){
+      drawCtx.strokeStyle='#4488ffaa';drawCtx.lineWidth=1;
+      drawCtx.beginPath();drawCtx.moveTo(pts[0].x*sc,pts[0].y*sc);
+      pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
+      if(closed)drawCtx.closePath();
+      drawCtx.stroke();
+    }
+    s.points.forEach((p,idx)=>{
+      const isSel=idx===selPtIdx && s.id === selShapeId;
+      drawCtx.beginPath();drawCtx.arc(p.x*sc,p.y*sc,isSel?6:4,0,Math.PI*2);
+      drawCtx.fillStyle=isSel?'#ff007f':(p.connectedTo?'#bb00ff':'#4488ff');drawCtx.fill();
+      drawCtx.strokeStyle='#fff';drawCtx.lineWidth=1;drawCtx.stroke();
+    });
+  }
+  
+  drawCtx.restore();
 }

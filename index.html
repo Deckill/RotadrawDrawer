@@ -112,6 +112,25 @@ M,l//1l,,,,<1/crcrrrrrrrrcrrrrr-,.,,l</cZZZJZZJZJrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
           <button class="panel-btn" id="algo-bspline" onclick="setSplineAlgo('bspline')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;" data-i18n="B-스플라인">B-스플라인</button>
         </div>
       </div>
+      
+      <button class="panel-btn" id="tool-circle" onclick="setDrawTool('circle')" data-i18n="원">원</button>
+      <div id="circle-algo-container" style="display: none; margin: 5px 0; padding: 4px; background: #1a1a1c; border-radius: 4px;">
+        <div style="font-size: 10px; color: #8e8e93; margin-bottom: 4px;" data-i18n="그리기 방식:">그리기 방식:</div>
+        <div style="display: flex; gap: 4px;">
+          <button class="panel-btn active" id="circle-3pt" onclick="setCircleMode('circle3pt')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;" data-i18n="3점 원">3점 원</button>
+          <button class="panel-btn" id="circle-2pt" onclick="setCircleMode('circle2pt')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;" data-i18n="중심점 원">중심점 원</button>
+        </div>
+      </div>
+
+      <button class="panel-btn" id="tool-arc" onclick="setDrawTool('arc')" data-i18n="호">호</button>
+      <div id="arc-algo-container" style="display: none; margin: 5px 0; padding: 4px; background: #1a1a1c; border-radius: 4px;">
+        <div style="font-size: 10px; color: #8e8e93; margin-bottom: 4px;" data-i18n="그리기 방식:">그리기 방식:</div>
+        <div style="display: flex; gap: 4px;">
+          <button class="panel-btn active" id="arc-3pt" onclick="setArcMode('arc3pt')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;" data-i18n="3점 호">3점 호</button>
+          <button class="panel-btn" id="arc-center" onclick="setArcMode('arcCenter')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;" data-i18n="중심점 호">중심점 호</button>
+        </div>
+      </div>
+
       <button class="panel-btn" id="tool-line" onclick="setDrawTool('line')" data-i18n="직선">직선</button>
       <button class="panel-btn" id="tool-select" onclick="setDrawTool('select')" data-i18n="선택 / 이동">선택 / 이동</button>
       <div class="panel-title" style="margin-top:8px" data-i18n="두께 (mm)">두께 (mm)</div>
@@ -123,6 +142,12 @@ M,l//1l,,,,<1/crcrrrrrrrrcrrrrr-,.,,l</cZZZJZZJZJrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
       <div class="input-row">
         <input type="range" id="shape-opacity-range" min="0.05" max="1" step="0.05" value="1" oninput="onShapeOpacity(this.value)">
         <input type="number" id="shape-opacity-num" value="1.00" min="0.05" max="1" step="0.05" style="width:52px;flex:none" oninput="onShapeOpacityNum(this.value)">
+      </div>
+      <div style="margin-top:8px;">
+        <label style="display:flex;align-items:center;cursor:pointer;font-size:12px;color:#eee;">
+          <input type="checkbox" id="global-hollow-chk" checked onchange="onGlobalHollow(this.checked)" style="margin:0 6px 0 0;cursor:pointer;">
+          <span data-i18n="닫힌 도형 속 비우기 (○)">닫힌 도형 속 비우기 (○)</span>
+        </label>
       </div>
       <div style="display:flex;gap:4px;margin-top:8px">
         <button class="panel-btn" style="flex:1;margin:0" onclick="deleteSelectedShape()" data-i18n="삭제">삭제</button>
@@ -142,6 +167,13 @@ M,l//1l,,,,<1/crcrrrrrrrrcrrrrr-,.,,l</cZZZJZZJZJrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
         <label style="font-size:12px; color:#ddd; margin-right:4px;" data-i18n="총 그룹 수">총 그룹 수</label>
         <input type="number" id="random-group-count" value="4" min="2" max="20" style="width:40px; background:#0f3460; border:1px solid #1a4a7a; border-radius:3px; color:#eee; padding:3px; font-size:12px;">
         <button class="panel-btn" onclick="generateRandomLayout()" style="margin:0; padding:4px 8px; flex:1;" data-i18n="랜덤 분산 배치">랜덤 분산 배치</button>
+      </div>
+      <div style="margin-bottom:8px; background:#1a1a1c; padding:6px; border-radius:4px;">
+        <div style="font-size:10px; color:#8e8e93; margin-bottom:4px;" data-i18n="이동 기준">이동 기준</div>
+        <div style="display:flex; gap:4px;">
+          <button class="panel-btn active" id="drag-mode-shape" onclick="setArrDragMode('shape')" style="font-size:10px; margin:0; padding:4px; flex:1;" data-i18n="도형 기준">도형 기준</button>
+          <button class="panel-btn" id="drag-mode-handle" onclick="setArrDragMode('handle')" style="font-size:10px; margin:0; padding:4px; flex:1;" data-i18n="핸들 기준">핸들 기준</button>
+        </div>
       </div>
       <div class="panel-title" data-i18n="그룹">그룹</div>
       <button class="panel-btn" onclick="addGroup()" data-i18n="새 그룹 생성">+ 그룹 추가</button>

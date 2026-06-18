@@ -175,18 +175,42 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
   
   if (exportTarget === 'all' || exportTarget === 'labels') {
     const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+    const renderedCCs = new Set();
     shapes.forEach(s => {
       if(!s.groupId)return;
       if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
       const g=groups.find(x=>x.id===s.groupId);if(!g)return;
       const targetId = s._isCopy ? s._origId : s.id;
-      const lbl=labels[targetId]||{ox:4,oy:-4};
-      const ctr = shapeCenter(s);
+      
+      const cc = getConnectedComponent(targetId);
+      const ccKey = cc.join(',');
+      if (renderedCCs.has(ccKey)) return;
+      renderedCCs.add(ccKey);
+      
+      let sumX = 0, sumY = 0, count = 0;
+      cc.forEach(id => {
+         const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+         if (cs) {
+           const ctr = shapeCenter(cs);
+           sumX += ctr.x; sumY += ctr.y; count++;
+         }
+      });
+      if (count === 0) return;
+      const ctr = { x: sumX/count, y: sumY/count };
+      
+      const rootId = cc[0];
+      const lbl=labels[rootId]||{ox:4,oy:-4};
       
       const lx = ctr.x + lbl.ox;
       const ly = ctr.y + lbl.oy;
       
-      const strStr = String(g.label);
+      let strStr = String(g.label);
+      if (isCCClosed(targetId)) {
+        const rootShape = shapes.find(x => x.id === rootId);
+        if (rootShape) {
+          strStr = (rootShape.isHollow !== false ? '○' : '●') + strStr;
+        }
+      }
       const letterSpacing = 0.8;
       const totalWidth = (strStr.length - 1) * letterSpacing;
       const startX = -totalWidth / 2;
@@ -210,6 +234,20 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
               oc2.fill(p2d);
             }
           });
+        } else if (char === '○' || char === '●') {
+          const charX = lx + offsetX * labelSize;
+          const charY = ly;
+          const charRot = g.rotation !== 0 ? rotAround({x: charX, y: charY}, circle.cx, circle.cy, g.rotation) : {x: charX, y: charY};
+          
+          oc2.save();
+          oc2.fillStyle = g.color;
+          oc2.strokeStyle = g.color;
+          oc2.lineWidth = hw * 2 * mmScale;
+          oc2.beginPath();
+          oc2.arc(charRot.x * mmScale, charRot.y * mmScale, 0.4 * labelSize * mmScale, 0, Math.PI * 2);
+          if (char === '●') oc2.fill();
+          else oc2.stroke();
+          oc2.restore();
         } else if (exportFont === 'vector') {
           // 'vector'는 PDF/PNG 특성상 실제 폰트 사용
           oc2.save();
@@ -252,7 +290,7 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
       oc2.fill(); oc2.stroke();
       oc2.restore();
       
-      const strStr = String(g.label);
+      let strStr = String(g.label);
       const labelSize = parseFloat(document.getElementById('label-size')?document.getElementById('label-size').value:4) || 4;
       const mLabelSize = labelSize;
       const letterSpacing = 0.8;
@@ -283,6 +321,20 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
                 oc2.fill(p2d);
               }
             });
+          } else if (char === '○' || char === '●') {
+            const charX = cx + offsetX * mLabelSize;
+            const charY = cy;
+            const charRot = mRot !== 0 ? rotAround({x: charX, y: charY}, circle.cx, circle.cy, mRot) : {x: charX, y: charY};
+            
+            oc2.save();
+            oc2.fillStyle = g.color;
+            oc2.strokeStyle = g.color;
+            oc2.lineWidth = mHw * 2 * mmScale;
+            oc2.beginPath();
+            oc2.arc(charRot.x * mmScale, charRot.y * mmScale, 0.4 * mLabelSize * mmScale, 0, Math.PI * 2);
+            if (char === '●') oc2.fill();
+            else oc2.stroke();
+            oc2.restore();
           } else if (exportFont === 'vector') {
             oc2.save();
             oc2.translate(circle.cx*mmScale, circle.cy*mmScale);
@@ -412,10 +464,55 @@ const vectorDigits = {
   '6': [{ closed: false, points: [ {x:0.2, y:-0.4, inT:{x:0,y:0}, outT:{x:-0.1,y:-0.1}}, {x:-0.3, y:0.1, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.15, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:0, y:-0.1, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.1, inT:{x:0,y:-0.1}, outT:{x:0,y:0}} ]}],
   '7': [{ closed: false, points: [ {x:-0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0, y:0.5, inT:{x:0,y:0}, outT:{x:0,y:0}} ]}],
   '8': [{ closed: true, points: [ {x:0, y:-0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.15}}, {x:0, y:0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.25, inT:{x:0,y:0.15}, outT:{x:0,y:-0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.25, inT:{x:0,y:0.15}, outT:{x:0,y:-0.15}} ]}],
-  '9': [{ closed: false, points: [ {x:-0.2, y:0.4, inT:{x:0,y:0}, outT:{x:0.1,y:0.1}}, {x:0.3, y:-0.1, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:0, y:-0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.15, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.1, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.1, inT:{x:0,y:0.1}, outT:{x:0,y:0}} ]}]
+  '9': [{ closed: false, points: [ {x:-0.2, y:0.4, inT:{x:0,y:0}, outT:{x:0.1,y:0.1}}, {x:0.3, y:-0.1, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:0, y:-0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.15, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.1, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.1, inT:{x:0,y:0.1}, outT:{x:0,y:0}} ]}],
+  '○': [{ closed: true, isHollow: true, points: [ {x:0, y:-0.4, inT:{x:-0.22,y:0}, outT:{x:0.22,y:0}}, {x:0.4, y:0, inT:{x:0,y:-0.22}, outT:{x:0,y:0.22}}, {x:0, y:0.4, inT:{x:0.22,y:0}, outT:{x:-0.22,y:0}}, {x:-0.4, y:0, inT:{x:0,y:0.22}, outT:{x:0,y:-0.22}} ]}],
+  '●': [{ closed: true, isHollow: false, points: [ {x:0, y:-0.4, inT:{x:-0.22,y:0}, outT:{x:0.22,y:0}}, {x:0.4, y:0, inT:{x:0,y:-0.22}, outT:{x:0,y:0.22}}, {x:0, y:0.4, inT:{x:0.22,y:0}, outT:{x:-0.22,y:0}}, {x:-0.4, y:0, inT:{x:0,y:0.22}, outT:{x:0,y:-0.22}} ]}]
 };
 
+function svgNativeSimplePathD(s, rot, cx, cy, customScale = 96 / 25.4) {
+  if (s.type !== 'spline' && s.type !== 'line') {
+    const {pts, closed} = getPolyline(s);
+    if (!pts || pts.length < 2) return null;
+    const tempShape = { ...s, type: 'line', points: pts.map(p => ({x: p.x, y: p.y})), closed: closed };
+    return svgNativeSimplePathD(tempShape, rot, cx, cy, customScale);
+  }
+  const f = v => (v * customScale).toFixed(3);
+  const n = s.points.length;
+  if (n < 2) return null;
+  const isLine = s.type === 'line';
+  const closed = s.closed === true;
+  const segs = closed ? n : n - 1;
+  let d = '';
+
+  for (let i = 0; i < segs; i++) {
+    const p0_orig = s.points[i];
+    const p1_orig = s.points[(i + 1) % n];
+    const p0 = rot !== 0 ? rotAround(p0_orig, cx, cy, rot) : p0_orig;
+    const p1 = rot !== 0 ? rotAround(p1_orig, cx, cy, rot) : p1_orig;
+    
+    if (i === 0) d += `M ${f(p0.x)} ${f(p0.y)} `;
+    
+    if (isLine || (!p0_orig.outT && !p1_orig.inT)) {
+       d += `L ${f(p1.x)} ${f(p1.y)} `;
+    } else {
+       const c0_orig = {x: p0_orig.x + (p0_orig.outT ? p0_orig.outT.x : 0), y: p0_orig.y + (p0_orig.outT ? p0_orig.outT.y : 0)};
+       const c1_orig = {x: p1_orig.x + (p1_orig.inT ? p1_orig.inT.x : 0), y: p1_orig.y + (p1_orig.inT ? p1_orig.inT.y : 0)};
+       const c0 = rot !== 0 ? rotAround(c0_orig, cx, cy, rot) : c0_orig;
+       const c1 = rot !== 0 ? rotAround(c1_orig, cx, cy, rot) : c1_orig;
+       d += `C ${f(c0.x)} ${f(c0.y)}, ${f(c1.x)} ${f(c1.y)}, ${f(p1.x)} ${f(p1.y)} `;
+    }
+  }
+  if (closed) d += "Z";
+  return d;
+}
+
 function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
+  if (s.type !== 'spline' && s.type !== 'line') {
+    const {pts, closed} = getPolyline(s);
+    if (!pts || pts.length < 2) return null;
+    const tempShape = { ...s, type: 'line', points: pts.map(p => ({x: p.x, y: p.y})), closed: closed };
+    return svgNativeOffsetPathD(tempShape, rot, cx, cy, customScale);
+  }
   const f = v => (v * customScale).toFixed(3);
   const hw = (s.strokeWidth || strokeWidth) / 2;
   const closed = s.closed === true;
@@ -492,18 +589,9 @@ function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
     }
   }
 
-  for(let i=1; i<segs; i++) {
-    const midO = {x: (outerSegs[i-1].q3.x + outerSegs[i].q0.x)/2, y: (outerSegs[i-1].q3.y + outerSegs[i].q0.y)/2};
-    outerSegs[i-1].q3 = midO; outerSegs[i].q0 = midO;
-    const midI = {x: (innerSegs[i-1].q3.x + innerSegs[i].q0.x)/2, y: (innerSegs[i-1].q3.y + innerSegs[i].q0.y)/2};
-    innerSegs[i-1].q3 = midI; innerSegs[i].q0 = midI;
-  }
-  if(closed) {
-    const midO = {x: (outerSegs[segs-1].q3.x + outerSegs[0].q0.x)/2, y: (outerSegs[segs-1].q3.y + outerSegs[0].q0.y)/2};
-    outerSegs[segs-1].q3 = midO; outerSegs[0].q0 = midO;
-    const midI = {x: (innerSegs[segs-1].q3.x + innerSegs[0].q0.x)/2, y: (innerSegs[segs-1].q3.y + innerSegs[0].q0.y)/2};
-    innerSegs[segs-1].q3 = midI; innerSegs[0].q0 = midI;
-  }
+  const getSweep = (v1, v2) => {
+    return (v1.x * v2.y - v1.y * v2.x) >= 0 ? 1 : 0;
+  };
 
   let d = '';
 
@@ -513,6 +601,14 @@ function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
       const o = outerSegs[i];
       if(isLine) d += `L ${f(o.q3.x)} ${f(o.q3.y)} `;
       else d += `C ${f(o.q1.x)} ${f(o.q1.y)}, ${f(o.q2.x)} ${f(o.q2.y)}, ${f(o.q3.x)} ${f(o.q3.y)} `;
+      
+      if (i < segs - 1) {
+         const nextO = outerSegs[i+1];
+         const p = rot !== 0 ? rotAround(s.points[i+1], cx, cy, rot) : s.points[i+1];
+         const v1 = {x: o.q3.x - p.x, y: o.q3.y - p.y};
+         const v2 = {x: nextO.q0.x - p.x, y: nextO.q0.y - p.y};
+         d += `A ${f(hw)} ${f(hw)} 0 0 ${getSweep(v1, v2)} ${f(nextO.q0.x)} ${f(nextO.q0.y)} `;
+      }
     }
     const endI = innerSegs[segs-1].q3;
     d += `A ${f(hw)} ${f(hw)} 0 0 0 ${f(endI.x)} ${f(endI.y)} `;
@@ -521,6 +617,14 @@ function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
       const inn = innerSegs[i];
       if(isLine) d += `L ${f(inn.q0.x)} ${f(inn.q0.y)} `;
       else d += `C ${f(inn.q2.x)} ${f(inn.q2.y)}, ${f(inn.q1.x)} ${f(inn.q1.y)}, ${f(inn.q0.x)} ${f(inn.q0.y)} `;
+      
+      if (i > 0) {
+         const nextInn = innerSegs[i-1];
+         const p = rot !== 0 ? rotAround(s.points[i], cx, cy, rot) : s.points[i];
+         const v1 = {x: inn.q0.x - p.x, y: inn.q0.y - p.y};
+         const v2 = {x: nextInn.q3.x - p.x, y: nextInn.q3.y - p.y};
+         d += `A ${f(hw)} ${f(hw)} 0 0 ${getSweep(v1, v2)} ${f(nextInn.q3.x)} ${f(nextInn.q3.y)} `;
+      }
     }
     const startO = outerSegs[0].q0;
     d += `A ${f(hw)} ${f(hw)} 0 0 0 ${f(startO.x)} ${f(startO.y)} Z`;
@@ -530,6 +634,14 @@ function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
       const o = outerSegs[i];
       if(isLine) d += `L ${f(o.q3.x)} ${f(o.q3.y)} `;
       else d += `C ${f(o.q1.x)} ${f(o.q1.y)}, ${f(o.q2.x)} ${f(o.q2.y)}, ${f(o.q3.x)} ${f(o.q3.y)} `;
+      
+      const nextIdx = (i + 1) % n;
+      const nextOIdx = (i + 1) % segs;
+      const nextO = outerSegs[nextOIdx];
+      const p = rot !== 0 ? rotAround(s.points[nextIdx], cx, cy, rot) : s.points[nextIdx];
+      const v1 = {x: o.q3.x - p.x, y: o.q3.y - p.y};
+      const v2 = {x: nextO.q0.x - p.x, y: nextO.q0.y - p.y};
+      d += `A ${f(hw)} ${f(hw)} 0 0 ${getSweep(v1, v2)} ${f(nextO.q0.x)} ${f(nextO.q0.y)} `;
     }
     d += 'Z ';
     
@@ -538,6 +650,14 @@ function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
       const inn = innerSegs[i];
       if(isLine) d += `L ${f(inn.q0.x)} ${f(inn.q0.y)} `;
       else d += `C ${f(inn.q2.x)} ${f(inn.q2.y)}, ${f(inn.q1.x)} ${f(inn.q1.y)}, ${f(inn.q0.x)} ${f(inn.q0.y)} `;
+      
+      const nextIdx = i; // The junction is at p[i]
+      const nextOIdx = (i - 1 + segs) % segs;
+      const nextInn = innerSegs[nextOIdx];
+      const p = rot !== 0 ? rotAround(s.points[nextIdx], cx, cy, rot) : s.points[nextIdx];
+      const v1 = {x: inn.q0.x - p.x, y: inn.q0.y - p.y};
+      const v2 = {x: nextInn.q3.x - p.x, y: nextInn.q3.y - p.y};
+      d += `A ${f(hw)} ${f(hw)} 0 0 ${getSweep(v1, v2)} ${f(nextInn.q3.x)} ${f(nextInn.q3.y)} `;
     }
     d += 'Z';
   }
@@ -581,7 +701,12 @@ function exportSVG(){
     groups.forEach(g=>{
       shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
         if(s.points.length >= 2){
-          const d = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          let d;
+          if (s.isHollow === false && isShapeClosed(s)) {
+              d = svgNativeSimplePathD(s, g.rotation, circle.cx, circle.cy);
+          } else {
+              d = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          }
           if(d){
             svg+=`  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
           }
@@ -593,18 +718,42 @@ function exportSVG(){
   if (exportTarget === 'all' || exportTarget === 'labels') {
     // 숫자 레이블 SVG 추가 (모든 복제 그룹 포함, 벡터화)
     const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+    const renderedCCs = new Set();
     shapes.forEach(s => {
       if(!s.groupId)return;
       if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
       const g=groups.find(x=>x.id===s.groupId);if(!g)return;
       const targetId = s._isCopy ? s._origId : s.id;
-      const lbl=labels[targetId]||{ox:4,oy:-4};
-      const ctr = shapeCenter(s);
+      
+      const cc = getConnectedComponent(targetId);
+      const ccKey = cc.join(',');
+      if (renderedCCs.has(ccKey)) return;
+      renderedCCs.add(ccKey);
+      
+      let sumX = 0, sumY = 0, count = 0;
+      cc.forEach(id => {
+         const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+         if (cs) {
+           const ctr = shapeCenter(cs);
+           sumX += ctr.x; sumY += ctr.y; count++;
+         }
+      });
+      if (count === 0) return;
+      const ctr = { x: sumX/count, y: sumY/count };
+      
+      const rootId = cc[0];
+      const lbl=labels[rootId]||{ox:4,oy:-4};
       
       const lx = ctr.x + lbl.ox;
       const ly = ctr.y + lbl.oy;
       
-      const strStr = String(g.label);
+      let strStr = String(g.label);
+      if (isCCClosed(targetId)) {
+        const rootShape = shapes.find(x => x.id === rootId);
+        if (rootShape) {
+          strStr = (rootShape.isHollow !== false ? '○' : '●') + strStr;
+        }
+      }
       const letterSpacing = 0.8;
       const totalWidth = (strStr.length - 1) * letterSpacing;
       const startX = -totalWidth / 2;
@@ -623,7 +772,7 @@ function exportSVG(){
             const d = getHexSegmentD(rp1, rp2, hw);
             if (d) svg += `  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
           });
-        } else if (exportFont === 'vector' && vectorDigits[char]) {
+        } else if ((exportFont === 'vector' || char === '○' || char === '●') && vectorDigits[char]) {
           vectorDigits[char].forEach(stroke => {
             const scaledPoints = stroke.points.map(p => ({
               x: lx + (p.x + offsetX) * labelSize,
@@ -631,8 +780,13 @@ function exportSVG(){
               inT: { x: p.inT.x * labelSize, y: p.inT.y * labelSize },
               outT: { x: p.outT.x * labelSize, y: p.outT.y * labelSize }
             }));
-            const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: hw * 2, points: scaledPoints };
-            const d = svgNativeOffsetPathD(mockShape, g.rotation, circle.cx, circle.cy);
+            const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: hw * 2, points: scaledPoints, isHollow: stroke.isHollow };
+            let d;
+            if (mockShape.isHollow === false && isShapeClosed(mockShape)) {
+                d = svgNativeSimplePathD(mockShape, g.rotation, circle.cx, circle.cy);
+            } else {
+                d = svgNativeOffsetPathD(mockShape, g.rotation, circle.cx, circle.cy);
+            }
             if (d) svg += `  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
           });
         }
@@ -653,7 +807,7 @@ function exportSVG(){
       const dLine = getSquareLineD(rp1, rp2, 0.5);
       if(dLine) svg += `  <path d="${dLine}" fill="${g.color}" stroke="none" fill-opacity="0.73" />\n`;
       
-      const strStr = String(g.label);
+      let strStr = String(g.label);
       const mLabelSize = parseFloat(document.getElementById('label-size')?document.getElementById('label-size').value:4) || 4;
       const letterSpacing = 0.8;
       const totalWidth = (strStr.length - 1) * letterSpacing;
@@ -676,7 +830,7 @@ function exportSVG(){
               const dText = getHexSegmentD(p1Rot, p2Rot, mHw);
               if (dText) svg += `  <path d="${dText}" fill="${g.color}" stroke="none" fill-opacity="${opac}" />\n`;
             });
-          } else if (exportFont === 'vector' && vectorDigits[char]) {
+          } else if ((exportFont === 'vector' || char === '○' || char === '●') && vectorDigits[char]) {
             vectorDigits[char].forEach(stroke => {
               const scaledPoints = stroke.points.map(p => ({
                 x: cx + (p.x + offsetX) * mLabelSize,
@@ -684,8 +838,13 @@ function exportSVG(){
                 inT: { x: p.inT.x * mLabelSize, y: p.inT.y * mLabelSize },
                 outT: { x: p.outT.x * mLabelSize, y: p.outT.y * mLabelSize }
               }));
-              const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: mHw * 2, points: scaledPoints };
-              const dText = svgNativeOffsetPathD(mockShape, mRot, circle.cx, circle.cy);
+              const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: mHw * 2, points: scaledPoints, isHollow: stroke.isHollow };
+              let dText;
+              if (mockShape.isHollow === false && isShapeClosed(mockShape)) {
+                  dText = svgNativeSimplePathD(mockShape, mRot, circle.cx, circle.cy);
+              } else {
+                  dText = svgNativeOffsetPathD(mockShape, mRot, circle.cx, circle.cy);
+              }
               if (dText) svg += `  <path d="${dText}" fill="${g.color}" stroke="none" fill-opacity="${opac}" />\n`;
             });
           }
@@ -908,18 +1067,42 @@ function exportDXF(){
 
   if (exportTarget === 'all' || exportTarget === 'labels') {
     const labelSize = parseFloat(document.getElementById('label-size').value) || 4;
+    const renderedCCs = new Set();
     shapes.forEach(s => {
       if(!s.groupId)return;
       if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) return;
       const g=groups.find(x=>x.id===s.groupId);if(!g)return;
       const targetId = s._isCopy ? s._origId : s.id;
-      const lbl=labels[targetId]||{ox:4,oy:-4};
-      const ctr = shapeCenter(s);
+      
+      const cc = getConnectedComponent(targetId);
+      const ccKey = cc.join(',');
+      if (renderedCCs.has(ccKey)) return;
+      renderedCCs.add(ccKey);
+      
+      let sumX = 0, sumY = 0, count = 0;
+      cc.forEach(id => {
+         const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+         if (cs) {
+           const ctr = shapeCenter(cs);
+           sumX += ctr.x; sumY += ctr.y; count++;
+         }
+      });
+      if (count === 0) return;
+      const ctr = { x: sumX/count, y: sumY/count };
+      
+      const rootId = cc[0];
+      const lbl=labels[rootId]||{ox:4,oy:-4};
       
       const lx = ctr.x + lbl.ox;
       const ly = ctr.y + lbl.oy;
       
-      const strStr = String(g.label);
+      let strStr = String(g.label);
+      if (isCCClosed(targetId)) {
+        const rootShape = shapes.find(x => x.id === rootId);
+        if (rootShape) {
+          strStr = (rootShape.isHollow !== false ? '○' : '●') + strStr;
+        }
+      }
       const letterSpacing = 0.8;
       const totalWidth = (strStr.length - 1) * letterSpacing;
       const startX = -totalWidth / 2;
@@ -938,7 +1121,7 @@ function exportDXF(){
             const d = getHexSegmentD(rp1, rp2, hw);
             if (d) processSvgPath(d, `G${g.id}_Labels`);
           });
-        } else if (exportFont === 'vector' && vectorDigits[char]) {
+        } else if ((exportFont === 'vector' || char === '○' || char === '●') && vectorDigits[char]) {
           vectorDigits[char].forEach(stroke => {
             const scaledPoints = stroke.points.map(p => ({
               x: lx + (p.x + offsetX) * labelSize,
@@ -946,8 +1129,13 @@ function exportDXF(){
               inT: { x: p.inT.x * labelSize, y: p.inT.y * labelSize },
               outT: { x: p.outT.x * labelSize, y: p.outT.y * labelSize }
             }));
-            const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: hw * 2, points: scaledPoints };
-            const d = svgNativeOffsetPathD(mockShape, g.rotation, circle.cx, circle.cy);
+            const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: hw * 2, points: scaledPoints, isHollow: stroke.isHollow };
+            let d;
+            if (mockShape.isHollow === false && isShapeClosed(mockShape)) {
+                d = svgNativeSimplePathD(mockShape, g.rotation, circle.cx, circle.cy);
+            } else {
+                d = svgNativeOffsetPathD(mockShape, g.rotation, circle.cx, circle.cy);
+            }
             if (d) processSvgPath(d, `G${g.id}_Labels`);
           });
         }
@@ -968,7 +1156,7 @@ function exportDXF(){
       const dLine = getSquareLineD(rp1, rp2, 0.5);
       if(dLine) processSvgPath(dLine, `G${g.id}_Labels`);
       
-      const strStr = String(g.label);
+      let strStr = String(g.label);
       const mLabelSize = 3.5;
       const letterSpacing = 0.8;
       const totalWidth = (strStr.length - 1) * letterSpacing;
@@ -991,7 +1179,7 @@ function exportDXF(){
               const dText = getHexSegmentD(p1Rot, p2Rot, mHw);
               if (dText) processSvgPath(dText, `G${g.id}_Labels`);
             });
-          } else if (exportFont === 'vector' && vectorDigits[char]) {
+          } else if ((exportFont === 'vector' || char === '○' || char === '●') && vectorDigits[char]) {
             vectorDigits[char].forEach(stroke => {
               const scaledPoints = stroke.points.map(p => ({
                 x: cx + (p.x + offsetX) * mLabelSize,
@@ -999,8 +1187,13 @@ function exportDXF(){
                 inT: { x: p.inT.x * mLabelSize, y: p.inT.y * mLabelSize },
                 outT: { x: p.outT.x * mLabelSize, y: p.outT.y * mLabelSize }
               }));
-              const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: mHw * 2, points: scaledPoints };
-              const dText = svgNativeOffsetPathD(mockShape, mRot, circle.cx, circle.cy);
+              const mockShape = { closed: stroke.closed, type: 'spline', strokeWidth: mHw * 2, points: scaledPoints, isHollow: stroke.isHollow };
+              let dText;
+              if (mockShape.isHollow === false && isShapeClosed(mockShape)) {
+                  dText = svgNativeSimplePathD(mockShape, mRot, circle.cx, circle.cy);
+              } else {
+                  dText = svgNativeOffsetPathD(mockShape, mRot, circle.cx, circle.cy);
+              }
               if (dText) processSvgPath(dText, `G${g.id}_Labels`);
             });
           }

@@ -95,7 +95,7 @@ mainCanvas.addEventListener('mousedown',e=>{if(e.button!==0)return;const p=clien
 
 mainCanvas.addEventListener('mousemove',e=>{
   const p=clientToMm(e);
-  if(_mdMm&&Math.hypot(p.x-_mdMm.x,p.y-_mdMm.y)>0.6)_hasDragged=true;
+  if(_mdMm&&(e.ctrlKey||Math.hypot(p.x-_mdMm.x,p.y-_mdMm.y)>0.6))_hasDragged=true;
   document.getElementById('sb-pos').textContent=`x: ${p.x.toFixed(1)}  y: ${p.y.toFixed(1)} mm`;
   if(currentMode==='canvas')mCanvasMove(p,e);
   else if(currentMode==='draw')mDrawMove(p,e);
@@ -114,11 +114,26 @@ mainCanvas.addEventListener('contextmenu',e=>{
     const hp = hitPoint(p);
     if(hp) {
        const s = shapes.find(x => x.id === hp.shapeId);
-         if(s && s.type === 'spline') {
-            const p = s.points[hp.ptIdx];
-                        const isSym = p.mode === 'sym';
+       if (s) {
+         const p = s.points[hp.ptIdx];
+         let menuItems = [];
+         
+         if (p.connectedTo) {
+           menuItems.push({
+             label: '연결 해제',
+             action: () => {
+               disconnectPoint(s, hp.ptIdx);
+               render();
+               saveSnapshot();
+               triggerAutosave();
+             }
+           });
+         }
+         
+         if (s.type === 'spline') {
+            const isSym = p.mode === 'sym';
             const isSmooth = p.mode === 'smooth';
-                        showContextMenu(e, [
+            menuItems.push(
               {
                 label: 'Smooth 모드',
                 action: () => {
@@ -155,20 +170,49 @@ mainCanvas.addEventListener('contextmenu',e=>{
               {
                 label: '점 삭제',
                 action: () => {
+                  disconnectPoint(s, hp.ptIdx); // disconnect before delete
                   s.points.splice(hp.ptIdx, 1);
                   if(s.points.length<2) {
-                    shapes=shapes.filter(x=>x.id!==s.id);
+                    const idToDel = s.id;
+                    shapes=shapes.filter(x=>x.id!==idToDel && x._origId!==idToDel);
                   }
                   selPtIdx=null; render();
                 }
               }
-            ]);
-            return;
-          }
+            );
+         }
+         
+         if (menuItems.length > 0) {
+           showContextMenu(e, menuItems);
+           return;
+         }
+       }
     }
     const hs = hitSegment(p);
     if(hs && hs.type === 'spline'){
        showContextMenu(e, [
+         {
+           label: '앞으로 보내기',
+           action: () => {
+             const origId = hs._origId || hs.id;
+             const relatedShapes = shapes.filter(s => s.id === origId || s._origId === origId);
+             shapes = shapes.filter(s => s.id !== origId && s._origId !== origId);
+             shapes.push(...relatedShapes);
+             render();
+             triggerAutosave();
+           }
+         },
+         {
+           label: '뒤로 보내기',
+           action: () => {
+             const origId = hs._origId || hs.id;
+             const relatedShapes = shapes.filter(s => s.id === origId || s._origId === origId);
+             shapes = shapes.filter(s => s.id !== origId && s._origId !== origId);
+             shapes.unshift(...relatedShapes);
+             render();
+             triggerAutosave();
+           }
+         },
          {
            label: '점 추가',
            action: () => {

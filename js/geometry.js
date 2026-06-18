@@ -1,6 +1,112 @@
+
+function getCircle2PtPts(rawPts) {
+  if (rawPts.length < 2) return [];
+  const p0 = rawPts[0], p1 = rawPts[1];
+  const r = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+  if (r < 0.1) return [];
+  const pts = [];
+  const steps = 72;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    pts.push({ x: p0.x + Math.cos(angle)*r, y: p0.y + Math.sin(angle)*r });
+  }
+  return pts;
+}
+
+function getCircleFrom3Pts(p1, p2, p3) {
+  const x1 = p1.x, y1 = p1.y;
+  const x2 = p2.x, y2 = p2.y;
+  const x3 = p3.x, y3 = p3.y;
+  const d = 2 * (x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2));
+  if (Math.abs(d) < 1e-6) return null; // colinear
+  const cx = ((x1*x1 + y1*y1)*(y2-y3) + (x2*x2 + y2*y2)*(y3-y1) + (x3*x3 + y3*y3)*(y1-y2)) / d;
+  const cy = ((x1*x1 + y1*y1)*(x3-x2) + (x2*x2 + y2*y2)*(x1-x3) + (x3*x3 + y3*y3)*(x2-x1)) / d;
+  const r = Math.hypot(x1 - cx, y1 - cy);
+  return { cx, cy, r };
+}
+
+function getCircle3PtPts(rawPts) {
+  if (rawPts.length < 2) return [];
+  if (rawPts.length === 2) {
+    // Just show a line preview
+    return [{x:rawPts[0].x,y:rawPts[0].y}, {x:rawPts[1].x,y:rawPts[1].y}];
+  }
+  const c = getCircleFrom3Pts(rawPts[0], rawPts[1], rawPts[2]);
+  if (!c) return [{x:rawPts[0].x,y:rawPts[0].y}, {x:rawPts[1].x,y:rawPts[1].y}, {x:rawPts[2].x,y:rawPts[2].y}];
+  const pts = [];
+  const steps = 72;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    pts.push({ x: c.cx + Math.cos(angle)*c.r, y: c.cy + Math.sin(angle)*c.r });
+  }
+  return pts;
+}
+
+function getArcCenterPts(rawPts) {
+  if (rawPts.length < 2) return [];
+  const center = rawPts[0], start = rawPts[1];
+  const r = Math.hypot(start.x - center.x, start.y - center.y);
+  if (r < 0.1) return [];
+  if (rawPts.length === 2) {
+    return [{x:center.x, y:center.y}, {x:start.x, y:start.y}];
+  }
+  const end = rawPts[2];
+  let startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+  let endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+  
+  // Always draw arc counter-clockwise from start to end
+  let sweep = endAngle - startAngle;
+  if (sweep < 0) sweep += Math.PI * 2;
+  
+  const pts = [];
+  const steps = Math.max(10, Math.ceil((sweep / (Math.PI * 2)) * 72));
+  for (let i = 0; i <= steps; i++) {
+    const angle = startAngle + (i / steps) * sweep;
+    pts.push({ x: center.x + Math.cos(angle)*r, y: center.y + Math.sin(angle)*r });
+  }
+  return pts;
+}
+
+function getArc3PtPts(rawPts) {
+  if (rawPts.length < 2) return [];
+  if (rawPts.length === 2) {
+    return [{x:rawPts[0].x,y:rawPts[0].y}, {x:rawPts[1].x,y:rawPts[1].y}];
+  }
+  const c = getCircleFrom3Pts(rawPts[0], rawPts[1], rawPts[2]);
+  if (!c) return [{x:rawPts[0].x,y:rawPts[0].y}, {x:rawPts[1].x,y:rawPts[1].y}, {x:rawPts[2].x,y:rawPts[2].y}];
+  
+  let startAngle = Math.atan2(rawPts[0].y - c.cy, rawPts[0].x - c.cx);
+  let midAngle = Math.atan2(rawPts[1].y - c.cy, rawPts[1].x - c.cx);
+  let endAngle = Math.atan2(rawPts[2].y - c.cy, rawPts[2].x - c.cx);
+  
+  // Determine direction to pass through midAngle
+  let sweep = endAngle - startAngle;
+  if (sweep < 0) sweep += Math.PI * 2;
+  
+  let midSweep = midAngle - startAngle;
+  if (midSweep < 0) midSweep += Math.PI * 2;
+  
+  if (midSweep > sweep) {
+    sweep -= Math.PI * 2; // draw clockwise
+  }
+  
+  const pts = [];
+  const steps = Math.max(10, Math.ceil((Math.abs(sweep) / (Math.PI * 2)) * 72));
+  for (let i = 0; i <= steps; i++) {
+    const angle = startAngle + (i / steps) * sweep;
+    pts.push({ x: c.cx + Math.cos(angle)*c.r, y: c.cy + Math.sin(angle)*c.r });
+  }
+  return pts;
+}
+
 function getPolyline(s) {
   const closed = s.closed === true;
   if (s.type === 'line') return {pts: s.points.map(p=>({x:p.x, y:p.y})), closed};
+  if (s.type === 'circle2pt') return {pts: getCircle2PtPts(s.points), closed: true};
+  if (s.type === 'circle3pt') return {pts: getCircle3PtPts(s.points), closed: true};
+  if (s.type === 'arcCenter') return {pts: getArcCenterPts(s.points), closed: false};
+  if (s.type === 'arc3pt') return {pts: getArc3PtPts(s.points), closed: false};
+
   const rawPts = s.points;
   const rn = rawPts.length;
   if (rn < 2) return {pts: rawPts.map(p=>({x:p.x, y:p.y})), closed};
@@ -119,6 +225,10 @@ function hitPoint(pos){
 
 function isPointInPolygon(p, s) {
   const {pts} = getPolyline(s);
+  return isPointInPolygonPts(p, pts);
+}
+
+function isPointInPolygonPts(p, pts) {
   const n = pts.length;
   if (n < 3) return false;
   let inside = false;
@@ -141,8 +251,17 @@ function hitSegment(pos){
     if(currentMode==='arrange' && s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
     const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
     const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
-    if (isShapeClosed(s)) {
-      if (isPointInPolygon(pLocal, s)) return s;
+    
+    const targetId = s._isCopy ? s._origId : s.id;
+    if (isCCClosed(targetId)) {
+      const rootId = getConnectedComponent(targetId)[0];
+      const rootShape = shapes.find(x => x.id === rootId);
+      if (rootShape && rootShape.isHollow !== true) {
+         const loop = getCCLoopPolyline(targetId);
+         if (loop && isPointInPolygonPts(pLocal, loop.pts)) return s;
+      }
+    } else if (isShapeClosed(s)) {
+      if (s.isHollow !== true && isPointInPolygon(pLocal, s)) return s;
     }
     const{pts}=getPolyline(s);
     for(let j=0;j<pts.length-1;j++){if(segDist(pLocal,pts[j],pts[j+1])<thresh)return s;}
@@ -173,7 +292,7 @@ function hitGroupMarker(pos,g){
 function distToShape(pos,s){
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
   const pLocal = g ? rotAround(pos, circle.cx, circle.cy, -g.rotation) : pos;
-  if (isShapeClosed(s) && isPointInPolygon(pLocal, s)) {
+  if (isShapeClosed(s) && s.isHollow !== true && isPointInPolygon(pLocal, s)) {
     return 0;
   }
   const{pts}=getPolyline(s);
@@ -181,6 +300,26 @@ function distToShape(pos,s){
   for(let j=0;j<pts.length-1;j++)md=Math.min(md,segDist(pLocal,pts[j],pts[j+1]));
   if(isShapeClosed(s)&&pts.length>2)md=Math.min(md,segDist(pLocal,pts[pts.length-1],pts[0]));
   return Math.max(0,md-(s.strokeWidth||strokeWidth)/2);
+}
+
+function distToCCPolyline(pLocal, loopPolyline) {
+  const pts = loopPolyline.pts;
+  if (!pts || pts.length < 3) return Infinity;
+  
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y;
+    const xj = pts[j].x, yj = pts[j].y;
+    const intersect = ((yi > pLocal.y) !== (yj > pLocal.y))
+        && (pLocal.x < (xj - xi) * (pLocal.y - yi) / (yj - yi + 1e-10) + xi);
+    if (intersect) inside = !inside;
+  }
+  if (inside) return 0;
+  
+  let md = Infinity;
+  for(let j=0;j<pts.length-1;j++) md=Math.min(md,segDist(pLocal,pts[j],pts[j+1]));
+  md=Math.min(md,segDist(pLocal,pts[pts.length-1],pts[0]));
+  return md;
 }
 
 function snapToPoint(pos,excludeId=null){
@@ -318,4 +457,152 @@ function updateHermiteTangents(s) {
   } else {
     solveNaturalCubicSpline(pts, s.closed);
   }
+}
+
+function getConnectedComponent(startId) {
+  const visited = new Set();
+  const queue = [startId];
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    if (visited.has(curr)) continue;
+    visited.add(curr);
+    const s = shapes.find(x => x.id === curr);
+    if (s) {
+      if (s.points[0] && s.points[0].connectedTo) queue.push(s.points[0].connectedTo.shapeId);
+      if (s.points.length > 1 && s.points[s.points.length - 1].connectedTo) queue.push(s.points[s.points.length - 1].connectedTo.shapeId);
+    }
+  }
+  return Array.from(visited).sort((a,b)=>a-b);
+}
+
+function isCCClosed(startId) {
+  const cc = getConnectedComponent(startId);
+  for (let id of cc) {
+    const s = shapes.find(x => x.id === id);
+    if (!s) return false;
+    if (s.closed) return true;
+    const p0 = s.points[0];
+    const p1 = s.points[s.points.length - 1];
+    if (!p0.connectedTo || !p1.connectedTo) return false;
+  }
+  return true;
+}
+
+function getCCLoopPolyline(startId) {
+  const cc = getConnectedComponent(startId);
+  if (!isCCClosed(startId)) return null;
+  if (cc.length === 1 && shapes.find(x=>x.id===cc[0]).closed) {
+    return getPolyline(shapes.find(x=>x.id===cc[0]));
+  }
+  
+  const s0 = shapes.find(x => x.id === startId);
+  const pts = [];
+  let currShape = s0;
+  let currEntryPtIdx = 0;
+  const visited = new Set();
+  
+  // Start from s0
+  while (!visited.has(currShape.id)) {
+    visited.add(currShape.id);
+    const { pts: sPts } = getPolyline(currShape);
+    if (currEntryPtIdx === currShape.points.length - 1) {
+      pts.push(...sPts.slice().reverse().slice(0, -1));
+      const nextConn = currShape.points[0].connectedTo;
+      if (!nextConn) break;
+      currShape = shapes.find(x => x.id === nextConn.shapeId);
+      currEntryPtIdx = nextConn.ptIdx;
+    } else {
+      pts.push(...sPts.slice(0, -1));
+      const nextConn = currShape.points[currShape.points.length - 1].connectedTo;
+      if (!nextConn) break;
+      currShape = shapes.find(x => x.id === nextConn.shapeId);
+      currEntryPtIdx = nextConn.ptIdx;
+    }
+  }
+  return { pts, closed: true };
+}
+
+function disconnectPoint(s, ptIdx) {
+  const conn = s.points[ptIdx].connectedTo;
+  if (conn) {
+    const s2 = shapes.find(x => x.id === conn.shapeId);
+    if (s2 && s2.points[conn.ptIdx]) {
+      s2.points[conn.ptIdx].connectedTo = null;
+    }
+    s.points[ptIdx].connectedTo = null;
+  }
+}
+
+function tryConnectPoints(shapeId, ptIdx) {
+  const s = shapes.find(x => x.id === shapeId);
+  if (!s || s.closed) return false;
+  
+  const isStart = (ptIdx === 0);
+  const isEnd = (ptIdx === s.points.length - 1);
+  if (!isStart && !isEnd) return false;
+  
+  if (s.points[ptIdx].connectedTo) {
+    disconnectPoint(s, ptIdx);
+  }
+  
+  const p = s.points[ptIdx];
+  const g = s.groupId ? groups.find(x => x.id === s.groupId) : null;
+  const pWorld = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
+  
+  // 1. Check self-intersection
+  for (let i = 0; i < s.points.length; i++) {
+    if (i === ptIdx) continue;
+    const p2 = s.points[i];
+    const p2World = g ? rotAround(p2, circle.cx, circle.cy, g.rotation) : p2;
+    if (Math.hypot(pWorld.x - p2World.x, pWorld.y - p2World.y) < SNAP_D) {
+      const isOtherEnd = (i === 0 || i === s.points.length - 1);
+      if (isOtherEnd) {
+        disconnectPoint(s, i);
+        s.points[ptIdx].connectedTo = { shapeId: s.id, ptIdx: i };
+        s.points[i].connectedTo = { shapeId: s.id, ptIdx: ptIdx };
+        s.points[ptIdx].x = p2.x; s.points[ptIdx].y = p2.y;
+        return true;
+      }
+    }
+  }
+
+  // 2. Check other shapes
+  for (let i = 0; i < shapes.length; i++) {
+    const s2 = shapes[i];
+    if (s2.id === s.id || s2.closed || s2._isCopy) continue;
+    if (s.groupId !== s2.groupId && s.groupId !== GROUP1_ID && s2.groupId !== GROUP1_ID) continue;
+    
+    const g2 = s2.groupId ? groups.find(x => x.id === s2.groupId) : null;
+    const ends = [0, s2.points.length - 1];
+    for (let j of ends) {
+      if (s2.points[j].connectedTo) continue; // Only connect 1:1 to unconnected
+      const p2 = s2.points[j];
+      const p2World = g2 ? rotAround(p2, circle.cx, circle.cy, g2.rotation) : p2;
+      if (Math.hypot(pWorld.x - p2World.x, pWorld.y - p2World.y) < SNAP_D) {
+        s.points[ptIdx].connectedTo = { shapeId: s2.id, ptIdx: j };
+        s2.points[j].connectedTo = { shapeId: s.id, ptIdx: ptIdx };
+        const pWorldSnapped = g2 ? rotAround(s2.points[j], circle.cx, circle.cy, g2.rotation) : s2.points[j];
+        const pLocal = g ? rotAround(pWorldSnapped, circle.cx, circle.cy, -g.rotation) : pWorldSnapped;
+        s.points[ptIdx].x = pLocal.x; s.points[ptIdx].y = pLocal.y;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function getGroupShapeCount(groupId) {
+    const validShapes = shapes.filter(s => s.groupId === groupId && (groupId !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2);
+    const countedCCs = new Set();
+    let count = 0;
+    validShapes.forEach(s => {
+       const targetId = s._isCopy ? s._origId : s.id;
+       const cc = getConnectedComponent(targetId);
+       const ccKey = cc.join(',');
+       if (!countedCCs.has(ccKey)) {
+          countedCCs.add(ccKey);
+          count++;
+       }
+    });
+    return count;
 }

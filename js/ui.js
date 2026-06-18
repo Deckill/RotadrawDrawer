@@ -25,7 +25,9 @@ function showContextMenu(e, items){
 function deleteSelectedShape(){
   if(selShapeId!==null){
     saveSnapshot(); // 삭제 전 저장
-    shapes=shapes.filter(s=>s.id!==selShapeId);selShapeId=null;selPtIdx=null;dragState=null;
+    const idToDel = selShapeId;
+    shapes=shapes.filter(s=>s.id!==idToDel && s._origId!==idToDel);
+    selShapeId=null;selPtIdx=null;dragState=null;
   }
   render();
   triggerAutosave();
@@ -40,11 +42,14 @@ function updatePropsPanel(){
     const opr=document.getElementById('shape-opacity-range');
     const opn=document.getElementById('shape-opacity-num');
     if(opr){opr.value='1';opn.value='1.00';}
+    const chk=document.getElementById('global-hollow-chk');
+    if(chk){ chk.checked=(window.isHollowDefault !== false); chk.disabled=false; }
     return;
   }
   const s=shapes.find(x=>x.id===selShapeId);if(!s)return;
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
   let h=`<b>${t('도형')} #${s.id}</b><br>${t('타입:')} ${s.type}<br>${t('두께:')} ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>${t('그룹')}: ${g?t('그룹')+' '+g.label:t('없음')}<br>${t('점수:')} ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
+
   if(selPtIdx!==null&&s.points[selPtIdx]){
     const p=s.points[selPtIdx];
     h+=`<br><br><b>${t('점')}${selPtIdx}</b><br>x: ${p.x.toFixed(2)}<br>y: ${p.y.toFixed(2)}`;
@@ -55,6 +60,16 @@ function updatePropsPanel(){
   const opr=document.getElementById('shape-opacity-range');
   const opn=document.getElementById('shape-opacity-num');
   if(opr){opr.value=opVal;opn.value=opVal;}
+  
+  const chk=document.getElementById('global-hollow-chk');
+  if(chk) {
+      if (isShapeClosed(s)) {
+          chk.checked = (s.isHollow !== false);
+          chk.disabled = false;
+      } else {
+          chk.checked = (window.isHollowDefault !== false);
+      }
+  }
 }
 
 function updateCursor(){
@@ -90,9 +105,22 @@ function setMode(m){
 function setDrawTool(t){
   if(drawing)finishDrawing();
   drawTool=t;
-  ['spline','line','select'].forEach(tt=>document.getElementById('tool-'+tt).classList.toggle('active',tt===t));
+  
+  ['spline','line','select','circle','arc'].forEach(tt=>{
+    const el = document.getElementById('tool-'+tt);
+    if(el) el.classList.toggle('active',tt===t);
+  });
+  
+  const splineCont = document.getElementById('spline-algo-container');
+  if(splineCont) splineCont.style.display = (t==='spline') ? 'block' : 'none';
+  
+  const circleCont = document.getElementById('circle-algo-container');
+  if(circleCont) circleCont.style.display = (t==='circle') ? 'block' : 'none';
+  
+  const arcCont = document.getElementById('arc-algo-container');
+  if(arcCont) arcCont.style.display = (t==='arc') ? 'block' : 'none';
+
   selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;hoverPtRef=null;
-    
   updateCursor();render();
 }
 
@@ -219,7 +247,7 @@ function refreshGroupList() {
   if (list) {
     list.innerHTML='';
     groups.forEach(g=>{
-      const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+      const count = getGroupShapeCount(g.id);
       const d=document.createElement('div');
       d.className='group-item';
       const delHtml=g.locked?`<span class="group-del locked">${t("locked")}</span>`:`<span class="group-del" onclick="deleteGroup(${g.id});event.stopPropagation()">✕</span>`;
@@ -236,7 +264,7 @@ function refreshGroupList() {
   if (ll) {
     ll.innerHTML='';
     groups.forEach(g=>{
-      const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+      const count = getGroupShapeCount(g.id);
       const row=document.createElement('div');
       row.className='input-row';
       
@@ -557,3 +585,71 @@ function setLabelOffset(gId, axis, val) {
   render();
   if(typeof triggerAutosave === 'function') triggerAutosave();
 }
+
+
+window.setCircleMode = function(mode) {
+  window.circleAlgo = mode;
+  document.getElementById('circle-2pt').classList.toggle('active', mode === 'circle2pt');
+  document.getElementById('circle-3pt').classList.toggle('active', mode === 'circle3pt');
+  
+  if (window.drawing) window.finishDrawing();
+  window.drawing = true;
+  window.drawingShape = {id:Date.now(), type:mode, points:[], closed:true, isHollow:(window.isHollowDefault!==false)};
+};
+
+window.setArcMode = function(mode) {
+  window.arcAlgo = mode;
+  document.getElementById('arc-3pt').classList.toggle('active', mode === 'arc3pt');
+  document.getElementById('arc-center').classList.toggle('active', mode === 'arcCenter');
+  
+  if (window.drawing) window.finishDrawing();
+  window.drawing = true;
+  window.drawingShape = {id:Date.now(), type:mode, points:[], closed:false, isHollow:(window.isHollowDefault!==false)};
+};
+
+// We need to initialize circleAlgo and arcAlgo
+window.circleAlgo = 'circle3pt';
+window.arcAlgo = 'arc3pt';
+
+
+
+window.onGlobalHollow = function(val) {
+  window.isHollowDefault = val;
+  if (selShapeId !== null) {
+     const cc = getConnectedComponent(selShapeId);
+     cc.forEach(id => {
+       const s = shapes.find(x => x.id === id);
+       if (s) {
+         s.isHollow = val;
+         syncCopies(s);
+       }
+     });
+  }
+  render();
+  saveSnapshot();
+};
+
+function fixCopyConnections(ccOrigIds, groupId) {
+  ccOrigIds.forEach(id => {
+    const copy = shapes.find(s => s._origId === id && s.groupId === groupId);
+    if (copy) {
+       copy.points.forEach(p => {
+          if (p.connectedTo) {
+             const targetCopy = shapes.find(s => s._origId === p.connectedTo.shapeId && s.groupId === groupId);
+             if (targetCopy) {
+                p.connectedTo.shapeId = targetCopy.id;
+             }
+          }
+       });
+    }
+  });
+}
+
+window.arrDragMode = 'shape';
+window.setArrDragMode = function(mode) {
+  window.arrDragMode = mode;
+  const shapeBtn = document.getElementById('drag-mode-shape');
+  const handleBtn = document.getElementById('drag-mode-handle');
+  if(shapeBtn) shapeBtn.classList.toggle('active', mode === 'shape');
+  if(handleBtn) handleBtn.classList.toggle('active', mode === 'handle');
+};

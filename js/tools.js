@@ -167,7 +167,12 @@ function mDrawDown(pos,e){
     const hs=hitSegment(pos);
     if(hs){
       selShapeId=hs.id;selPtIdx=null;selHandle=null;
-      dragState={type:'shape',shapeId:hs.id,startPos:{...pos},origPts:hs.points.map(p=>({...p})),origCps:hs.cps?JSON.parse(JSON.stringify(hs.cps)):null};
+      const cc = getConnectedComponent(hs.id);
+      const ccOrigs = cc.map(id => {
+         const cs = shapes.find(x => x.id === id);
+         return { id, origPts: cs.points.map(p=>({...p})), origCps: cs.cps?JSON.parse(JSON.stringify(cs.cps)):null };
+      });
+      dragState={type:'shape',shapeId:hs.id,startPos:{...pos}, ccOrigs};
       updatePropsPanel();render();return;
     }
     selShapeId=null;selPtIdx=null;selHandle=null;dragState=null;
@@ -178,16 +183,29 @@ function mDrawDown(pos,e){
   let sx=pos.x,sy=pos.y;
   if(!snapOff){const sn=snapToPoint(pos,drawing?drawingShape?.id:null);if(sn){sx=sn.x;sy=sn.y;}}
   if(!drawing){
-    drawingShape={id:nextShapeId++,type:drawTool,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'}],closed:false,strokeWidth,groupId:GROUP1_ID};
+    let finalType = drawTool;
+    if (drawTool === 'circle') finalType = window.circleAlgo || 'circle2pt';
+    if (drawTool === 'arc') finalType = window.arcAlgo || 'arc3pt';
+    
+    let isClosed = (drawTool === 'circle'); // 원은 기본적으로 닫힘, 호는 열림
+    
+    drawingShape={id:nextShapeId++,type:finalType,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'}],closed:isClosed,isHollow:(window.isHollowDefault!==false),strokeWidth,groupId:GROUP1_ID};
     drawing=true;
   } else {
     const p0=drawingShape.points[0];
-    if(drawingShape.points.length>=2&&Math.hypot(sx-p0.x,sy-p0.y)<SNAP_D){
-      drawingShape.closed=true;finishDrawing();return;
+    if(!snapOff && drawingShape.points.length>=2&&Math.hypot(sx-p0.x,sy-p0.y)<SNAP_D){
+      if (drawingShape.type !== 'circle2pt' && drawingShape.type !== 'circle3pt' && !drawingShape.type.startsWith('arc')) {
+          drawingShape.closed=true;finishDrawing();return;
+      }
     }
     drawingShape.points.push({x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'});
-      if (drawingShape.type==='spline') updateHermiteTangents(drawingShape);
-      // 그리기 중에는 원본 복사본 동기화 불필요 (혁재 그리는 도형은 아직 shapes에 없음)
+    if (drawingShape.type==='spline') updateHermiteTangents(drawingShape);
+    
+    let len = drawingShape.points.length;
+    if (drawingShape.type === 'circle2pt' && len === 2) { finishDrawing(); return; }
+    if (drawingShape.type === 'circle3pt' && len === 3) { finishDrawing(); return; }
+    if (drawingShape.type === 'arc3pt' && len === 3) { finishDrawing(); return; }
+    if (drawingShape.type === 'arcCenter' && len === 3) { finishDrawing(); return; }
   }
   render();
 }
@@ -260,19 +278,34 @@ function mDrawMove(pos,e){
       s.points[dragState.ptIdx].x=pLocal.x;
       s.points[dragState.ptIdx].y=pLocal.y;
       if(s.type==='spline') updateHermiteTangents(s);
+      
+      const conn = s.points[dragState.ptIdx].connectedTo;
+      if (conn) {
+        const s2 = shapes.find(x => x.id === conn.shapeId);
+        if (s2) {
+          const g2 = s2.groupId ? groups.find(x=>x.id===s2.groupId) : null;
+          const p2Local = g2 ? rotAround(pos, circle.cx, circle.cy, -g2.rotation) : pos;
+          s2.points[conn.ptIdx].x = p2Local.x;
+          s2.points[conn.ptIdx].y = p2Local.y;
+          if (s2.type === 'spline') updateHermiteTangents(s2);
+          syncCopies(s2);
+        }
+      }
       syncCopies(s);
     }
     render();return;
   }
   // Shape drag
   if(dragState?.type==='shape'&&_hasDragged){
-    const s=shapes.find(x=>x.id===dragState.shapeId);
-    if(s){
-      const dx=pos.x-dragState.startPos.x,dy=pos.y-dragState.startPos.y;
-      s.points.forEach((p,i)=>{p.x=dragState.origPts[i].x+dx;p.y=dragState.origPts[i].y+dy;});
-      if(s.cps&&dragState.origCps){s.cps.forEach((seg,i)=>{if(seg&&dragState.origCps[i]){seg[0]={x:dragState.origCps[i][0].x+dx,y:dragState.origCps[i][0].y+dy};seg[1]={x:dragState.origCps[i][1].x+dx,y:dragState.origCps[i][1].y+dy};}});}
-      syncCopies(s);
-    }
+    const dx=pos.x-dragState.startPos.x,dy=pos.y-dragState.startPos.y;
+    dragState.ccOrigs.forEach(co => {
+      const cs = shapes.find(x => x.id === co.id);
+      if (cs) {
+        cs.points.forEach((p,i)=>{p.x=co.origPts[i].x+dx;p.y=co.origPts[i].y+dy;});
+        if(cs.cps&&co.origCps){cs.cps.forEach((seg,i)=>{if(seg&&co.origCps[i]){seg[0]={x:co.origCps[i][0].x+dx,y:co.origCps[i][0].y+dy};seg[1]={x:co.origCps[i][1].x+dx,y:co.origCps[i][1].y+dy};}});}
+        syncCopies(cs);
+      }
+    });
     render();return;
   }
   // Point drag (activated on mousedown, starts on first move)
@@ -283,22 +316,48 @@ function mDrawMove(pos,e){
     }
   }
   if(!drawing){render();return;}
-  render();
   let px=pos.x,py=pos.y;
   if(!snapOff){const sn=snapToPoint(pos,drawingShape.id);if(sn){px=sn.x;py=sn.y;}}
+  
   const p0=drawingShape.points[0];
-  const willClose=drawingShape.points.length>=2&&Math.hypot(px-p0.x,py-p0.y)<SNAP_D;
-  const sc=MM*viewScale,last=drawingShape.points[drawingShape.points.length-1];
-  ctx.save();
-  ctx.strokeStyle=willClose?'#00ff88aa':'#fff5';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(last.x*sc,last.y*sc);ctx.lineTo(willClose?p0.x*sc:px*sc,willClose?p0.y*sc:py*sc);ctx.stroke();ctx.setLineDash([]);
-  if(willClose){ctx.strokeStyle='#00ff88';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p0.x*sc,p0.y*sc,8,0,Math.PI*2);ctx.stroke();}
-  ctx.restore();
+  const isArcCircle = drawingShape.type.startsWith('circle') || drawingShape.type.startsWith('arc');
+  const willClose= (!snapOff) && drawingShape.points.length>=2 && Math.hypot(px-p0.x,py-p0.y)<SNAP_D && !isArcCircle;
+  
+  let oldClosed = drawingShape.closed;
+  if (willClose) {
+      drawingShape.closed = true;
+      if (drawingShape.type === 'spline') updateHermiteTangents(drawingShape);
+      render();
+      drawingShape.closed = oldClosed;
+      if (drawingShape.type === 'spline') updateHermiteTangents(drawingShape);
+  } else {
+      drawingShape.points.push({x:px,y:py,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'});
+      if (drawingShape.type === 'spline') updateHermiteTangents(drawingShape);
+      render();
+      drawingShape.points.pop();
+      if (drawingShape.type === 'spline') updateHermiteTangents(drawingShape);
+  }
+
+  if (willClose) {
+     const sc=MM*viewScale;
+     ctx.save();
+     ctx.strokeStyle='#00ff88';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p0.x*sc,p0.y*sc,8,0,Math.PI*2);ctx.stroke();
+     ctx.restore();
+  }
 }
 
 function mDrawUp(pos,e){
   // 드래그가 있었으면 스냅셛 저장
-  if(dragState && _hasDragged) saveSnapshot();
+  if(dragState && _hasDragged) {
+    if (dragState.type === 'pt') {
+      const merged = tryConnectPoints(dragState.shapeId, dragState.ptIdx);
+      if (merged) {
+        selShapeId = null;
+        selPtIdx = null;
+      }
+    }
+    saveSnapshot();
+  }
   dragState=null;render();
 }
 
@@ -317,7 +376,14 @@ function mArrDown(pos,e){
     arrSelShapeId=hs.id;
     // Follow to original if copy
     const origId=hs._isCopy?hs._origId:hs.id;
-    arrDragState={type:'shape',shapeId:hs.id,origId,origGroupId:hs.groupId,startAng:Math.atan2(pos.y-circle.cy,pos.x-circle.cx),newGroupId:null};
+    const startMouseAngle360 = (Math.atan2(pos.x - circle.cx, -(pos.y - circle.cy)) * 180 / Math.PI + 360) % 360;
+    const origGroup = groups.find(g => g.id === hs.groupId);
+    let angleOffset = 0;
+    if (origGroup) {
+       angleOffset = origGroup.rotation - startMouseAngle360;
+    }
+    const ccOrigIds = getConnectedComponent(origId);
+    arrDragState={type:'shape',shapeId:hs.id,origId,origGroupId:hs.groupId,startAng:Math.atan2(pos.y-circle.cy,pos.x-circle.cx),newGroupId:null, angleOffset: angleOffset, ccOrigIds};
     refreshGroupList();render();return;
   }
   arrSelShapeId=null;arrDragState=null;refreshGroupList();render();
@@ -339,23 +405,33 @@ function mArrMove(pos,e){
     // 마우스의 12시 기준 각도 (0~360): sin(ang)*r = x방향, -cos(ang)*r = y방향
     const mouseAngle360 = (Math.atan2(pos.x - circle.cx, -(pos.y - circle.cy)) * 180 / Math.PI + 360) % 360;
 
+    let targetAngle = mouseAngle360;
+    if (window.arrDragMode === 'shape' && arrDragState.angleOffset !== undefined) {
+       targetAngle = ((mouseAngle360 + arrDragState.angleOffset) % 360 + 360) % 360;
+    }
+
     if(e.ctrlKey){
       if(!arrDragState.newGroupId){
-        const ng={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:mouseAngle360,locked:false};
+        const ng={id:nextGroupId++,label:groups.length+1,color:GCOLORS[groups.length%GCOLORS.length],rotation:targetAngle,locked:false};
         groups.push(ng);arrDragState.newGroupId=ng.id;refreshGroupList();
         // 원래 그룹이 GROUP1이 아니면 이동 (원본 그룹에서 제거)
         if(arrDragState.origGroupId !== GROUP1_ID){
-          removeCopy(origShape.id, arrDragState.origGroupId);
+          arrDragState.ccOrigIds.forEach(id => removeCopy(id, arrDragState.origGroupId));
           arrDragState.origGroupId = GROUP1_ID;
         }
       }
       const ng=groups.find(x=>x.id===arrDragState.newGroupId);
       // 새 그룹 rotation을 마우스 각도로 실시간 업데이트
-      if(ng) ng.rotation = mouseAngle360;
-      if(!shapes.some(s=>s._origId===origShape.id&&s.groupId===arrDragState.newGroupId)){
-        const copy=makeCopy(origShape,arrDragState.newGroupId);
-        arrSelShapeId=copy.id;
-      }
+      if(ng) ng.rotation = targetAngle;
+      
+      arrDragState.ccOrigIds.forEach(id => {
+        const cs = shapes.find(x => x.id === id);
+        if (cs && !shapes.some(s => s._origId === id && s.groupId === arrDragState.newGroupId)) {
+          const copy = makeCopy(cs, arrDragState.newGroupId);
+          if (id === origShape.id) arrSelShapeId = copy.id;
+        }
+      });
+      fixCopyConnections(arrDragState.ccOrigIds, arrDragState.newGroupId);
     } else {
       // ctrl 뗐을 때: 생성된 새 그룹이 있으면 취소하고 snap 모드 복귀
       if(arrDragState.newGroupId !== null){
@@ -372,20 +448,26 @@ function mArrMove(pos,e){
       let best=null, bestDiff=SNAP_DEG;
       groups.forEach(g=>{
         const gAngle = ((g.rotation % 360) + 360) % 360;
-        const raw = Math.abs(mouseAngle360 - gAngle);
+        const raw = Math.abs(targetAngle - gAngle);
         const circDiff = Math.min(raw, 360 - raw);
         if(circDiff < bestDiff){ bestDiff = circDiff; best = g; }
       });
       if(best && arrDragState.origGroupId !== best.id){
         if(arrDragState.origGroupId !== GROUP1_ID){
-          removeCopy(origShape.id, arrDragState.origGroupId);
+          arrDragState.ccOrigIds.forEach(id => removeCopy(id, arrDragState.origGroupId));
         }
         if(best.id === GROUP1_ID){
           arrSelShapeId = origShape.id;
           arrDragState.origGroupId = GROUP1_ID;
         } else {
-          const copy = makeCopy(origShape, best.id);
-          arrSelShapeId = copy.id;
+          arrDragState.ccOrigIds.forEach(id => {
+            const cs = shapes.find(x => x.id === id);
+            if (cs) {
+              const copy = makeCopy(cs, best.id);
+              if (id === origShape.id) arrSelShapeId = copy.id;
+            }
+          });
+          fixCopyConnections(arrDragState.ccOrigIds, best.id);
           arrDragState.origGroupId = best.id;
         }
       }
@@ -399,20 +481,39 @@ function mArrUp(pos,e){
   if(arrDragState && _hasDragged) saveSnapshot();
   arrDragState=null;render();
 }
-
 function mLblDown(pos,e){
+  const checkedCCs = new Set();
   for(let i=shapes.length-1; i>=0; i--){
     const s = shapes[i];
     if(!s.groupId)continue;
     if(s.groupId===GROUP1_ID && !s._isCopy && hasCopy(s.id)) continue;
     const g=groups.find(x=>x.id===s.groupId);if(!g)continue;
+    
     const targetId = s._isCopy ? s._origId : s.id;
-    const lbl=labels[targetId]||{ox:4,oy:-4};
-    const ctr=shapeCenter(s);
+    const cc = getConnectedComponent(targetId);
+    const ccKey = cc.join(',');
+    if (checkedCCs.has(ccKey)) continue;
+    checkedCCs.add(ccKey);
+    
+    let sumX = 0, sumY = 0, count = 0;
+    cc.forEach(id => {
+       const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+       if (cs) {
+         const ctr = shapeCenter(cs);
+         sumX += ctr.x; sumY += ctr.y; count++;
+       }
+    });
+    if (count === 0) continue;
+    const ctr = { x: sumX/count, y: sumY/count };
+    
+    const rootId = cc[0];
+    const lbl=labels[rootId]||{ox:4,oy:-4};
     const lp=rotAround(pos,circle.cx,circle.cy,-g.rotation);
     const fs=parseFloat(document.getElementById('label-size').value)||4;
+    
     if(Math.hypot(lp.x-(ctr.x+lbl.ox),lp.y-(ctr.y+lbl.oy))<fs){
-      lblDrag={shapeId:s.id,targetId:targetId,startLocal:lp,startOx:lbl.ox,startOy:lbl.oy};return;
+      lblDrag={shapeId:s.id, rootId: rootId, startLocal:lp, startOx:lbl.ox, startOy:lbl.oy, cc: cc, ctr: ctr};
+      return;
     }
   }
   lblDrag=null;
@@ -425,22 +526,49 @@ function mLblMove(pos,e){
   const lp=g?rotAround(pos,circle.cx,circle.cy,-g.rotation):pos;
   let ox=lblDrag.startOx+(lp.x-lblDrag.startLocal.x);
   let oy=lblDrag.startOy+(lp.y-lblDrag.startLocal.y);
-  const ctr=shapeCenter(s);
+  const ctr=lblDrag.ctr;
+  
+  const targetId = s._isCopy ? s._origId : s.id;
+  const isClosed = isCCClosed(targetId);
+  const loopPolyline = isClosed ? getCCLoopPolyline(targetId) : null;
   
   const pWorld = g ? rotAround({x:ctr.x+ox, y:ctr.y+oy}, circle.cx, circle.cy, g.rotation) : {x:ctr.x+ox, y:ctr.y+oy};
-  const d=distToShape(pWorld,s);
+  const pLocal = {x:ctr.x+ox, y:ctr.y+oy};
+  
+  let d = Infinity;
+  if (loopPolyline) {
+     d = distToCCPolyline(pLocal, loopPolyline);
+  } else {
+     lblDrag.cc.forEach(id => {
+        const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+        if (cs) d = Math.min(d, distToShape(pWorld, cs));
+     });
+  }
+  
   if(d>MAX_LBL){
     const mag=Math.hypot(ox,oy)||1;let lo=0,hi=mag;
     for(let k=0;k<20;k++){
       const mid=(lo+hi)/2;
       const pMidWorld = g ? rotAround({x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid}, circle.cx, circle.cy, g.rotation) : {x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid};
-      if(distToShape(pMidWorld,s)<=MAX_LBL)lo=mid;else hi=mid;
+      const pMidLocal = {x:ctr.x+ox/mag*mid, y:ctr.y+oy/mag*mid};
+      let dMid = Infinity;
+      if (loopPolyline) {
+         dMid = distToCCPolyline(pMidLocal, loopPolyline);
+      } else {
+         lblDrag.cc.forEach(id => {
+            const cs = shapes.find(x => (x.id === id || x._origId === id) && x.groupId === s.groupId);
+            if (cs) dMid = Math.min(dMid, distToShape(pMidWorld, cs));
+         });
+      }
+      if(dMid<=MAX_LBL)lo=mid;else hi=mid;
     }
     ox=ox/mag*lo;oy=oy/mag*lo;
   }
-  const targetId = lblDrag.targetId;
-  if(!labels[targetId])labels[targetId]={ox:4,oy:-4};
-  labels[targetId].ox=ox;labels[targetId].oy=oy;render();
+  
+  const rootId = lblDrag.rootId;
+  if(!labels[rootId])labels[rootId]={ox:4,oy:-4};
+  labels[rootId].ox=ox;labels[rootId].oy=oy;
+  render();
 }
 
 function mLblUp(pos){
@@ -457,6 +585,16 @@ function finishDrawing(){
   if(drawingShape.points.length>=2){
     if(drawingShape.type==='spline') updateHermiteTangents(drawingShape);
     shapes.push(drawingShape);
+    
+    if (!drawingShape.closed) {
+      const id = drawingShape.id;
+      let mergedStart = tryConnectPoints(id, 0);
+      const s = shapes.find(x => x.id === id);
+      if (s && !s.closed) {
+        tryConnectPoints(id, s.points.length - 1);
+      }
+    }
+    
     saveSnapshot(); // 도형 그리기 완료 시 저장
   }
   drawingShape=null;drawing=false;render();
