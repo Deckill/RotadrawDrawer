@@ -12,6 +12,7 @@ const GROUP1_ID  = 1;
 // ═══════════════════════════════════════════════
 let canvasW = 210, canvasH = 297, baseW = 210, baseH = 297;
 let circle  = { cx: 105, cy: 148.5, r: 75 };
+let centerHandleDiameter = 10;
 let images = [];
 let bgImage = null;
 let nextImgId = 1;
@@ -23,7 +24,7 @@ let canvSelHandle = null;
 let canvDragStartPos = null;
 let canvDragStartObj = null;
 let currentMode = 'canvas';
-let drawTool    = 'spline';
+let drawTool    = 'select';
 /*
   Shape = {
     id, type:'spline'|'line',
@@ -40,6 +41,7 @@ let groups = [], nextGroupId = 2;
 let activeDrawGroupId = GROUP1_ID;
 let labels = {};
 let strokeWidth = 1.0;
+window.isHollowDefault = true;
 // View
 let viewScale = 1, viewOffX = 0, viewOffY = 0;
 // Draw state
@@ -292,13 +294,13 @@ document.addEventListener('keydown',e=>{
 
   // Ctrl/Cmd 단축키
   if(e.ctrlKey||e.metaKey){
-    if(e.key==='z'||e.key==='Z'){
+    if(e.code==='KeyZ' || (e.key==='z'||e.key==='Z')){
       e.preventDefault();
       if(e.shiftKey)redo(); else undo();
       return;
     }
-    if(e.key==='y'||e.key==='Y'){e.preventDefault();redo();return;}
-    if(e.key==='s'||e.key==='S'){
+    if(e.code==='KeyY' || (e.key==='y'||e.key==='Y')){e.preventDefault();redo();return;}
+    if(e.code==='KeyS' || (e.key==='s'||e.key==='S')){
       e.preventDefault();
       if(e.shiftKey){
         saveProjectAs();
@@ -307,8 +309,74 @@ document.addEventListener('keydown',e=>{
       }
       return;
     }
-    if(e.key==='l'||e.key==='L'){e.preventDefault();loadProject();return;}
-    if(e.key==='p'||e.key==='P'){e.preventDefault();showExportModal();return;}
+    if(e.code==='KeyL' || (e.key==='l'||e.key==='L')){e.preventDefault();loadProject();return;}
+    if(e.code==='KeyP' || (e.key==='p'||e.key==='P')){e.preventDefault();showExportModal();return;}
+    if(e.code==='KeyC' || (e.key==='c'||e.key==='C')){
+      if(currentMode==='draw' && selShapeId!==null){
+         const ccIds = getConnectedComponent(selShapeId);
+         window.clipboardDataObj = ccIds.map(id => {
+           const s = shapes.find(x => x.id === id);
+           return s ? JSON.parse(JSON.stringify(s)) : null;
+         }).filter(Boolean);
+      }
+      return;
+    }
+    if(e.code==='KeyV' || (e.key==='v'||e.key==='V')){
+      if(currentMode==='draw' && window.clipboardDataObj && window.clipboardDataObj.length > 0){
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        window.clipboardDataObj.forEach(s => {
+          s.points.forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+          });
+        });
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        
+        const m = window.lastMousePosMm || {x: 0, y: 0};
+        const dx = m.x - cx;
+        const dy = m.y - cy;
+        
+        const idMap = {};
+        const newShapes = window.clipboardDataObj.map(origS => {
+          const newS = JSON.parse(JSON.stringify(origS));
+          newS.id = nextShapeId++;
+          idMap[origS.id] = newS.id;
+          newS.points.forEach(p => {
+            p.x += dx;
+            p.y += dy;
+          });
+          if (newS.cps) {
+            newS.cps.forEach(seg => {
+              if (seg) {
+                seg[0].x += dx; seg[0].y += dy;
+                seg[1].x += dx; seg[1].y += dy;
+              }
+            });
+          }
+          return newS;
+        });
+        
+        newShapes.forEach(s => {
+          s.points.forEach(p => {
+            if (p.connectedTo && idMap[p.connectedTo.shapeId]) {
+              p.connectedTo.shapeId = idMap[p.connectedTo.shapeId];
+            } else {
+              p.connectedTo = null;
+            }
+          });
+        });
+        
+        shapes.push(...newShapes);
+        selShapeId = newShapes[0].id;
+        selPtIdx = null;
+        saveSnapshot();
+        render();
+      }
+      return;
+    }
     return;
   }
 

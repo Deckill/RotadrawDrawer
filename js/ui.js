@@ -63,11 +63,12 @@ function updatePropsPanel(){
   
   const chk=document.getElementById('global-hollow-chk');
   if(chk) {
-      if (isShapeClosed(s)) {
+      if (isShapeClosed(s) || (typeof isCCClosed === 'function' && isCCClosed(s.id))) {
           chk.checked = (s.isHollow !== false);
           chk.disabled = false;
       } else {
-          chk.checked = (window.isHollowDefault !== false);
+          chk.checked = true; // always hollow for open shapes
+          chk.disabled = true;
       }
   }
 }
@@ -198,6 +199,7 @@ function onImageObjectLoaded(img) {
 }
 
 function circleFromInput() { circle.r=(parseFloat(document.getElementById('circle-d').value)||150)/2; render(); triggerAutosave(); }
+function handleFromInput() { centerHandleDiameter=parseFloat(document.getElementById('handle-d').value)||10; render(); triggerAutosave(); }
 
 function initDefaultGroup() {
   groups=[{id:GROUP1_ID,label:1,color:GCOLORS[0],rotation:0,locked:true}];
@@ -229,6 +231,7 @@ function syncCopies(origShape) {
     s.closed = origShape.closed;
     s.strokeWidth = origShape.strokeWidth;
     if (origShape.opacity !== undefined) s.opacity = origShape.opacity;
+    if (origShape.isHollow !== undefined) s.isHollow = origShape.isHollow;
   });
 }
 
@@ -565,11 +568,23 @@ function generateRandomLayout() {
   shapes = shapes.filter(s => !s._isCopy);
   const originShapes = shapes.filter(s => s.groupId === GROUP1_ID && s.points && s.points.length >= 2);
   
+  const processedCCs = new Set();
+  
   originShapes.forEach(s => {
+    const ccIds = getConnectedComponent(s.id);
+    const ccKey = ccIds.join(',');
+    if (processedCCs.has(ccKey)) return;
+    processedCCs.add(ccKey);
+    
     const groupIndex = Math.floor(Math.random() * totalGroups);
     const targetGroupId = groups[groupIndex].id;
+    
     if (targetGroupId !== GROUP1_ID) {
-      makeCopy(s, targetGroupId);
+      ccIds.forEach(id => {
+        const cs = originShapes.find(x => x.id === id);
+        if (cs) makeCopy(cs, targetGroupId);
+      });
+      fixCopyConnections(ccIds, targetGroupId);
     }
   });
 
@@ -613,14 +628,17 @@ window.arcAlgo = 'arc3pt';
 
 
 
-window.onGlobalHollow = function(val) {
-  window.isHollowDefault = val;
+window.toggleGlobalHollow = function() {
+  window.isHollowDefault = !window.isHollowDefault;
+  const btn = document.getElementById('global-hollow-btn');
+  if (btn) btn.classList.toggle('active', window.isHollowDefault);
+  
   if (selShapeId !== null) {
      const cc = getConnectedComponent(selShapeId);
      cc.forEach(id => {
        const s = shapes.find(x => x.id === id);
        if (s) {
-         s.isHollow = val;
+         s.isHollow = window.isHollowDefault;
          syncCopies(s);
        }
      });

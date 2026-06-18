@@ -95,6 +95,7 @@ mainCanvas.addEventListener('mousedown',e=>{if(e.button!==0)return;const p=clien
 
 mainCanvas.addEventListener('mousemove',e=>{
   const p=clientToMm(e);
+  window.lastMousePosMm = {x: p.x, y: p.y};
   if(_mdMm&&(e.ctrlKey||Math.hypot(p.x-_mdMm.x,p.y-_mdMm.y)>0.6))_hasDragged=true;
   document.getElementById('sb-pos').textContent=`x: ${p.x.toFixed(1)}  y: ${p.y.toFixed(1)} mm`;
   if(currentMode==='canvas')mCanvasMove(p,e);
@@ -103,12 +104,12 @@ mainCanvas.addEventListener('mousemove',e=>{
   else if(currentMode==='label')mLblMove(p,e);
 });
 
-mainCanvas.addEventListener('dblclick',e=>{if(currentMode==='draw'&&drawTool!=='select')finishDrawing();});
+mainCanvas.addEventListener('dblclick',e=>{if(currentMode==='draw'&&drawTool!=='select')finishDrawing(e);});
 
 
 mainCanvas.addEventListener('contextmenu',e=>{
   e.preventDefault();
-  if(drawing){finishDrawing();return;}
+  if(drawing){finishDrawing(e);return;}
   if(currentMode==='draw' && drawTool==='select'){
     const p = clientToMm(e);
     const hp = hitPoint(p);

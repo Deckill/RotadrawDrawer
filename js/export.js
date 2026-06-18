@@ -356,7 +356,7 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
       
       // Left side: Shape Count
       if (exportCount === 'yes') {
-        const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+        const count = typeof getGroupShapeCount === 'function' ? getGroupShapeCount(g.id) : shapes.filter(s => s.groupId === g.id && !(s.groupId === GROUP1_ID && !s._isCopy && hasCopy(s.id)) && s.points && s.points.length >= 2).length;
         const countStr = String(count);
         const ctw = (countStr.length - 1) * letterSpacing;
         const cLxCenter = circle.cx - 4.5 - (ctw * mLabelSize) / 2;
@@ -465,7 +465,7 @@ const vectorDigits = {
   '7': [{ closed: false, points: [ {x:-0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0.3, y:-0.5, inT:{x:0,y:0}, outT:{x:0,y:0}}, {x:0, y:0.5, inT:{x:0,y:0}, outT:{x:0,y:0}} ]}],
   '8': [{ closed: true, points: [ {x:0, y:-0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:0.25, inT:{x:0,y:-0.15}, outT:{x:0,y:0.15}}, {x:0, y:0.5, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:0.25, inT:{x:0,y:0.15}, outT:{x:0,y:-0.15}}, {x:0, y:0, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.25, inT:{x:0,y:0.15}, outT:{x:0,y:-0.15}} ]}],
   '9': [{ closed: false, points: [ {x:-0.2, y:0.4, inT:{x:0,y:0}, outT:{x:0.1,y:0.1}}, {x:0.3, y:-0.1, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:0, y:-0.5, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.3, y:-0.15, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.1, inT:{x:-0.2,y:0}, outT:{x:0.2,y:0}}, {x:0.3, y:-0.1, inT:{x:0,y:0.1}, outT:{x:0,y:0}} ]}],
-  '○': [{ closed: true, isHollow: true, points: [ {x:0, y:-0.4, inT:{x:-0.22,y:0}, outT:{x:0.22,y:0}}, {x:0.4, y:0, inT:{x:0,y:-0.22}, outT:{x:0,y:0.22}}, {x:0, y:0.4, inT:{x:0.22,y:0}, outT:{x:-0.22,y:0}}, {x:-0.4, y:0, inT:{x:0,y:0.22}, outT:{x:0,y:-0.22}} ]}],
+  '○': [{ closed: false, isHollow: true, points: [ {x:0.12, y:-0.38, inT:{x:0,y:0}, outT:{x:0.15,y:0.05}}, {x:0.4, y:0, inT:{x:0,y:-0.2}, outT:{x:0,y:0.2}}, {x:0, y:0.4, inT:{x:0.2,y:0}, outT:{x:-0.2,y:0}}, {x:-0.4, y:0, inT:{x:0,y:0.2}, outT:{x:0,y:-0.2}}, {x:-0.12, y:-0.38, inT:{x:-0.15,y:0.05}, outT:{x:0,y:0}} ]}],
   '●': [{ closed: true, isHollow: false, points: [ {x:0, y:-0.4, inT:{x:-0.22,y:0}, outT:{x:0.22,y:0}}, {x:0.4, y:0, inT:{x:0,y:-0.22}, outT:{x:0,y:0.22}}, {x:0, y:0.4, inT:{x:0.22,y:0}, outT:{x:-0.22,y:0}}, {x:-0.4, y:0, inT:{x:0,y:0.22}, outT:{x:0,y:-0.22}} ]}]
 };
 
@@ -675,6 +675,93 @@ function getSquareLineD(p0, p1, hw) {
   return `M ${f(p0.x + nx)} ${f(p0.y + ny)} L ${f(p1.x + nx)} ${f(p1.y + ny)} L ${f(p1.x - nx)} ${f(p1.y - ny)} L ${f(p0.x - nx)} ${f(p0.y - ny)} Z`;
 }
 
+function getNativeArcsAndCirclesForExport(s, rot, globalCx, globalCy) {
+  const p = getNativeCircleArcParams(s);
+  if (!p) return null;
+  const results = [];
+  const addGeom = (geom) => {
+    const pRot = rot === 0 ? {x: geom.cx, y: geom.cy} : rotAround({x: geom.cx, y: geom.cy}, globalCx, globalCy, rot);
+    const rotRad = rot * Math.PI / 180;
+    if (geom.type === 'circle') {
+      results.push({ type: 'circle', cx: pRot.x, cy: pRot.y, r: geom.r });
+    } else {
+      results.push({ 
+        type: 'arc', cx: pRot.x, cy: pRot.y, r: geom.r, 
+        startAngle: geom.startAngle + rotRad, 
+        endAngle: geom.endAngle + rotRad,
+        sweep: geom.sweep
+      });
+    }
+  };
+  if (isShapeFilled(s) && p.type === 'circle') {
+    addGeom(p);
+  } else if (isShapeFilled(s) && p.type === 'arc') {
+    addGeom(p);
+  }
+  
+  const hw = (s.strokeWidth || strokeWidth) / 2;
+  if (p.type === 'circle') {
+    addGeom({ ...p, r: p.r + hw });
+    addGeom({ ...p, r: p.r - hw });
+  } else {
+    addGeom({ ...p, r: p.r + hw });
+    addGeom({ ...p, r: p.r - hw });
+    const capSweep = p.sweep > 0 ? Math.PI : -Math.PI;
+    const startX = p.cx + Math.cos(p.startAngle) * p.r;
+    const startY = p.cy + Math.sin(p.startAngle) * p.r;
+    addGeom({ type: 'arc', cx: startX, cy: startY, r: hw, startAngle: p.startAngle + Math.PI, endAngle: p.startAngle + Math.PI + capSweep, sweep: capSweep });
+    const endX = p.cx + Math.cos(p.endAngle) * p.r;
+    const endY = p.cy + Math.sin(p.endAngle) * p.r;
+    addGeom({ type: 'arc', cx: endX, cy: endY, r: hw, startAngle: p.endAngle, endAngle: p.endAngle + capSweep, sweep: capSweep });
+  }
+  return results;
+}
+
+function getSvgNativeArcCirclePath(s, rot, globalCx, globalCy) {
+  const p = getNativeCircleArcParams(s);
+  if (!p) return null;
+  const f = v => (v * (96 / 25.4)).toFixed(3);
+  const pRot = rot === 0 ? {x: p.cx, y: p.cy} : rotAround({x: p.cx, y: p.cy}, globalCx, globalCy, rot);
+  const rotRad = rot * Math.PI / 180;
+  
+  if (p.type === 'circle') {
+    const hw = (s.strokeWidth || strokeWidth) / 2;
+    const ro = p.r + hw;
+    const ri = p.r - hw;
+    const cx = pRot.x, cy = pRot.y;
+    const dOuter = `M ${f(cx-ro)} ${f(cy)} A ${f(ro)} ${f(ro)} 0 1 1 ${f(cx+ro)} ${f(cy)} A ${f(ro)} ${f(ro)} 0 1 1 ${f(cx-ro)} ${f(cy)}`;
+    const dInner = `M ${f(cx-ri)} ${f(cy)} A ${f(ri)} ${f(ri)} 0 1 0 ${f(cx+ri)} ${f(cy)} A ${f(ri)} ${f(ri)} 0 1 0 ${f(cx-ri)} ${f(cy)}`;
+    return dOuter + " " + dInner;
+  }
+  
+  if (p.type === 'arc') {
+    const hw = (s.strokeWidth || strokeWidth) / 2;
+    const ro = p.r + hw;
+    const ri = p.r - hw;
+    const cx = pRot.x, cy = pRot.y;
+    const sa = p.startAngle + rotRad;
+    const ea = p.endAngle + rotRad;
+    const sweep = p.sweep;
+    
+    const ox1 = cx + Math.cos(sa)*ro, oy1 = cy + Math.sin(sa)*ro;
+    const ox2 = cx + Math.cos(ea)*ro, oy2 = cy + Math.sin(ea)*ro;
+    const ix1 = cx + Math.cos(sa)*ri, iy1 = cy + Math.sin(sa)*ri;
+    const ix2 = cx + Math.cos(ea)*ri, iy2 = cy + Math.sin(ea)*ri;
+    
+    const largeArc = Math.abs(sweep) > Math.PI ? 1 : 0;
+    const sweepFlagOuter = sweep > 0 ? 1 : 0;
+    const sweepFlagInner = sweep > 0 ? 0 : 1;
+    const capSweep = sweep > 0 ? 1 : 0;
+    
+    return `M ${f(ix1)} ${f(iy1)} ` +
+           `A ${f(hw)} ${f(hw)} 0 0 ${capSweep} ${f(ox1)} ${f(oy1)} ` +
+           `A ${f(ro)} ${f(ro)} 0 ${largeArc} ${sweepFlagOuter} ${f(ox2)} ${f(oy2)} ` +
+           `A ${f(hw)} ${f(hw)} 0 0 ${capSweep} ${f(ix2)} ${f(iy2)} ` +
+           `A ${f(ri)} ${f(ri)} 0 ${largeArc} ${sweepFlagInner} ${f(ix1)} ${f(iy1)} Z`;
+  }
+}
+
+
 function exportSVG(){
   document.getElementById('export-modal').style.display='none';
   const targetSel = document.getElementById('export-target');
@@ -701,14 +788,27 @@ function exportSVG(){
     groups.forEach(g=>{
       shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
         if(s.points.length >= 2){
-          let d;
-          if (s.isHollow === false && isShapeClosed(s)) {
-              d = svgNativeSimplePathD(s, g.rotation, circle.cx, circle.cy);
-          } else {
-              d = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          if (s.type === 'circle2pt' || s.type === 'circle3pt' || s.type === 'arcCenter' || s.type === 'arc3pt') {
+            const dStr = getSvgNativeArcCirclePath(s, g.rotation, circle.cx, circle.cy);
+            if (dStr) {
+              svg += `  <path d="${dStr}" fill="${g.color}" stroke="none" />\n`;
+            }
+            if (isShapeFilled(s) && isShapeClosed(s)) {
+              const p = getNativeCircleArcParams(s);
+              if (p && p.type === 'circle') {
+                  const pRot = g.rotation === 0 ? p : rotAround({x: p.cx, y: p.cy}, circle.cx, circle.cy, g.rotation);
+                  svg += `  <circle cx="${fs(pRot.x)}" cy="${fs(pRot.y)}" r="${fs(p.r)}" fill="${g.color}" stroke="none" />\n`;
+              }
+            }
+            return;
           }
-          if(d){
-            svg+=`  <path d="${d}" fill="${g.color}" stroke="none" />\n`;
+
+          let dOutline = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          if(dOutline) svg+=`  <path d="${dOutline}" fill="${g.color}" stroke="none" />\n`;
+          
+          if (isShapeClosed(s) && isShapeFilled(s)) {
+              let dFill = svgNativeSimplePathD(s, g.rotation, circle.cx, circle.cy);
+              if (dFill) svg+=`  <path d="${dFill}" fill="${g.color}" stroke="none" />\n`;
           }
         }
       });
@@ -795,7 +895,9 @@ function exportSVG(){
     
     // 가이드 원 SVG 추가 (중심 원 실선)
     svg += `<circle cx="${fs(circle.cx)}" cy="${fs(circle.cy)}" r="${fs(circle.r)}" stroke="#4488ff" stroke-opacity="0.67" stroke-width="${fs(0.5)}" stroke-dasharray="${fs(5)},${fs(5)}" fill="none" />\n`;
-    svg += `<circle cx="${fs(circle.cx)}" cy="${fs(circle.cy)}" r="${fs(2.5)}" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="${fs(0.4)}" />\n`;
+    svg += `<circle cx="${fs(circle.cx)}" cy="${fs(circle.cy)}" r="${fs(centerHandleDiameter/2)}" stroke="#ff4444" stroke-opacity="0.67" stroke-width="${fs(0.5)}" fill="none" />\n`;
+    svg += `<path d="M ${fs(circle.cx - 6)} ${fs(circle.cy)} L ${fs(circle.cx + 6)} ${fs(circle.cy)} M ${fs(circle.cx)} ${fs(circle.cy - 6)} L ${fs(circle.cx)} ${fs(circle.cy + 6)}" stroke="#ff4444" stroke-width="${fs(0.5)}" fill="none" />\n`;
+    svg += `<circle cx="${fs(circle.cx)}" cy="${fs(circle.cy)}" r="${fs(2)}" fill="#4488ff" fill-opacity="0.8" stroke="#4488ff" stroke-width="${fs(0.4)}" />\n`;
     
     // 그룹 마커 핸들 SVG 추가 (벡터화)
     groups.forEach(g => {
@@ -855,7 +957,7 @@ function exportSVG(){
       
       // Shape Count -> Left
       if (exportCount === 'yes') {
-        const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+        const count = typeof getGroupShapeCount === 'function' ? getGroupShapeCount(g.id) : shapes.filter(s => s.groupId === g.id && !(s.groupId === GROUP1_ID && !s._isCopy && hasCopy(s.id)) && s.points && s.points.length >= 2).length;
         const countStr = String(count);
         const ctw = (countStr.length - 1) * letterSpacing;
         const cLxCenter = circle.cx - 4.5 - (ctw * mLabelSize) / 2;
@@ -982,6 +1084,19 @@ function exportDXF(){
     dxf += `40\n${(r*SVG_SCALE).toFixed(4)}\n`;
   };
 
+  const writeArc = (layer, cx, cy, r, startAngleRad, endAngleRad) => {
+    dxf += `0\nARC\n8\n${layer}\n`;
+    dxf += `10\n${(cx*SVG_SCALE).toFixed(4)}\n20\n${(-cy*SVG_SCALE).toFixed(4)}\n`;
+    dxf += `40\n${(r*SVG_SCALE).toFixed(4)}\n`;
+    let startDeg = (-endAngleRad) * 180 / Math.PI;
+    let endDeg = (-startAngleRad) * 180 / Math.PI;
+    while(startDeg < 0) startDeg += 360;
+    while(startDeg >= 360) startDeg -= 360;
+    while(endDeg < 0) endDeg += 360;
+    while(endDeg >= 360) endDeg -= 360;
+    dxf += `50\n${startDeg.toFixed(4)}\n51\n${endDeg.toFixed(4)}\n`;
+  };
+
   const processSvgPath = (d, layer) => {
     const tokens = d.replace(/,/g, ' ').trim().split(/\s+/);
     let cx = 0, cy = 0;
@@ -1056,9 +1171,25 @@ function exportDXF(){
     groups.forEach(g=>{
       shapes.filter(s=>s.groupId===g.id&&!(s.groupId===GROUP1_ID&&!s._isCopy&&hasCopy(s.id))).forEach(s=>{
         if(s.points.length >= 2){
-          const d = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
-          if(d){
-            processSvgPath(d, `G${g.id}_Shapes`);
+          const nativeGeom = getNativeArcsAndCirclesForExport(s, g.rotation, circle.cx, circle.cy);
+          if (nativeGeom) {
+            nativeGeom.forEach(geom => {
+              if (geom.type === 'circle') {
+                writeCircle(`G${g.id}_Shapes`, geom.cx, geom.cy, geom.r);
+              } else {
+                writeArc(`G${g.id}_Shapes`, geom.cx, geom.cy, geom.r, geom.startAngle, geom.endAngle);
+              }
+            });
+            return;
+          }
+
+          const dOutline = svgNativeOffsetPathD(s, g.rotation, circle.cx, circle.cy);
+          if(dOutline){
+            processSvgPath(dOutline, `G${g.id}_Shapes`);
+          }
+          if (isShapeClosed(s) && isShapeFilled(s)) {
+            const dFill = svgNativeSimplePathD(s, g.rotation, circle.cx, circle.cy);
+            if (dFill) processSvgPath(dFill, `G${g.id}_Shapes`);
           }
         }
       });
@@ -1144,7 +1275,11 @@ function exportDXF(){
     
     // 가이드 원 DXF 추가 (Guide layer)
     writeCircle('Guide', circle.cx, circle.cy, circle.r);
-    writeCircle('Guide', circle.cx, circle.cy, 2.5);
+    writeCircle('Guide', circle.cx, circle.cy, centerHandleDiameter/2);
+    // Draw cross
+    processSvgPath(`M ${circle.cx - 6} ${circle.cy} L ${circle.cx + 6} ${circle.cy}`, 'Guide');
+    processSvgPath(`M ${circle.cx} ${circle.cy - 6} L ${circle.cx} ${circle.cy + 6}`, 'Guide');
+    writeCircle('Guide', circle.cx, circle.cy, 2.0);
     
     // 그룹 마커 핸들 DXF 추가
     groups.forEach(g => {
@@ -1204,7 +1339,7 @@ function exportDXF(){
       
       // Shape Count -> Left
       if (exportCount === 'yes') {
-        const count = shapes.filter(s => s.groupId === g.id && (g.id !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2).length;
+        const count = typeof getGroupShapeCount === 'function' ? getGroupShapeCount(g.id) : shapes.filter(s => s.groupId === g.id && !(s.groupId === GROUP1_ID && !s._isCopy && hasCopy(s.id)) && s.points && s.points.length >= 2).length;
         const countStr = String(count);
         const ctw = (countStr.length - 1) * letterSpacing;
         const cLxCenter = circle.cx - 4.5 - (ctw * mLabelSize) / 2;

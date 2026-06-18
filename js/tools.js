@@ -189,23 +189,23 @@ function mDrawDown(pos,e){
     
     let isClosed = (drawTool === 'circle'); // 원은 기본적으로 닫힘, 호는 열림
     
-    drawingShape={id:nextShapeId++,type:finalType,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'}],closed:isClosed,isHollow:(window.isHollowDefault!==false),strokeWidth,groupId:GROUP1_ID};
+    drawingShape={id:nextShapeId++,type:finalType,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth',noSnap:snapOff}],closed:isClosed,isHollow:(window.isHollowDefault!==false),strokeWidth,groupId:GROUP1_ID};
     drawing=true;
   } else {
     const p0=drawingShape.points[0];
     if(!snapOff && drawingShape.points.length>=2&&Math.hypot(sx-p0.x,sy-p0.y)<SNAP_D){
       if (drawingShape.type !== 'circle2pt' && drawingShape.type !== 'circle3pt' && !drawingShape.type.startsWith('arc')) {
-          drawingShape.closed=true;finishDrawing();return;
+          drawingShape.closed=true;finishDrawing(e);return;
       }
     }
-    drawingShape.points.push({x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth'});
+    drawingShape.points.push({x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth',noSnap:snapOff});
     if (drawingShape.type==='spline') updateHermiteTangents(drawingShape);
     
     let len = drawingShape.points.length;
-    if (drawingShape.type === 'circle2pt' && len === 2) { finishDrawing(); return; }
-    if (drawingShape.type === 'circle3pt' && len === 3) { finishDrawing(); return; }
-    if (drawingShape.type === 'arc3pt' && len === 3) { finishDrawing(); return; }
-    if (drawingShape.type === 'arcCenter' && len === 3) { finishDrawing(); return; }
+    if (drawingShape.type === 'circle2pt' && len === 2) { finishDrawing(e); return; }
+    if (drawingShape.type === 'circle3pt' && len === 3) { finishDrawing(e); return; }
+    if (drawingShape.type === 'arc3pt' && len === 3) { finishDrawing(e); return; }
+    if (drawingShape.type === 'arcCenter' && len === 3) { finishDrawing(e); return; }
   }
   render();
 }
@@ -350,11 +350,7 @@ function mDrawUp(pos,e){
   // 드래그가 있었으면 스냅셛 저장
   if(dragState && _hasDragged) {
     if (dragState.type === 'pt') {
-      const merged = tryConnectPoints(dragState.shapeId, dragState.ptIdx);
-      if (merged) {
-        selShapeId = null;
-        selPtIdx = null;
-      }
+      tryConnectPoints(dragState.shapeId, dragState.ptIdx, e ? e.ctrlKey : false);
     }
     saveSnapshot();
   }
@@ -580,7 +576,7 @@ function mLblUp(pos){
   render();
 }
 
-function finishDrawing(){
+function finishDrawing(e){
   if(!drawingShape){drawing=false;return;}
   if(drawingShape.points.length>=2){
     if(drawingShape.type==='spline') updateHermiteTangents(drawingShape);
@@ -588,10 +584,14 @@ function finishDrawing(){
     
     if (!drawingShape.closed) {
       const id = drawingShape.id;
-      let mergedStart = tryConnectPoints(id, 0);
       const s = shapes.find(x => x.id === id);
-      if (s && !s.closed) {
-        tryConnectPoints(id, s.points.length - 1);
+      if (s) {
+        const skipConnStart = s.points[0].noSnap || (e ? e.ctrlKey : false);
+        tryConnectPoints(id, 0, skipConnStart);
+        if (!s.closed) {
+          const skipConnEnd = s.points[s.points.length - 1].noSnap || (e ? e.ctrlKey : false);
+          tryConnectPoints(id, s.points.length - 1, skipConnEnd);
+        }
       }
     }
     

@@ -1,4 +1,44 @@
 
+function getNativeCircleArcParams(s) {
+  if (!s.points || s.points.length < 2) return null;
+  if (s.type === 'circle2pt') {
+    const r = Math.hypot(s.points[1].x - s.points[0].x, s.points[1].y - s.points[0].y);
+    if (r < 0.1) return null;
+    return { type: 'circle', cx: s.points[0].x, cy: s.points[0].y, r };
+  }
+  if (s.type === 'circle3pt') {
+    if (s.points.length < 3) return null;
+    const c = getCircleFrom3Pts(s.points[0], s.points[1], s.points[2]);
+    if (c) return { type: 'circle', cx: c.cx, cy: c.cy, r: c.r };
+  }
+  if (s.type === 'arcCenter') {
+    if (s.points.length < 3) return null;
+    const center = s.points[0], start = s.points[1], end = s.points[2];
+    const r = Math.hypot(start.x - center.x, start.y - center.y);
+    if (r < 0.1) return null;
+    let startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    let endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+    let sweep = endAngle - startAngle;
+    if (sweep < 0) sweep += Math.PI * 2;
+    return { type: 'arc', cx: center.x, cy: center.y, r, startAngle, endAngle: startAngle + sweep, sweep };
+  }
+  if (s.type === 'arc3pt') {
+    if (s.points.length < 3) return null;
+    const c = getCircleFrom3Pts(s.points[0], s.points[1], s.points[2]);
+    if (!c) return null;
+    let startAngle = Math.atan2(s.points[0].y - c.cy, s.points[0].x - c.cx);
+    let midAngle = Math.atan2(s.points[1].y - c.cy, s.points[1].x - c.cx);
+    let endAngle = Math.atan2(s.points[2].y - c.cy, s.points[2].x - c.cx);
+    let sweep = endAngle - startAngle;
+    if (sweep < 0) sweep += Math.PI * 2;
+    let midSweep = midAngle - startAngle;
+    if (midSweep < 0) midSweep += Math.PI * 2;
+    if (midSweep > sweep) sweep -= Math.PI * 2;
+    return { type: 'arc', cx: c.cx, cy: c.cy, r: c.r, startAngle, endAngle: startAngle + sweep, sweep };
+  }
+  return null;
+}
+
 function getCircle2PtPts(rawPts) {
   if (rawPts.length < 2) return [];
   const p0 = rawPts[0], p1 = rawPts[1];
@@ -158,6 +198,13 @@ function shapeCenter(s){
 
 function isShapeClosed(s){
   return s.closed === true;
+}
+
+function isShapeFilled(s) {
+  if (s.isHollow !== false) return false;
+  if (isShapeClosed(s)) return true;
+  if (typeof isCCClosed === 'function' && isCCClosed(s.id)) return true;
+  return false;
 }
 
 function getHandlePositions(s, ptIdx) {
@@ -533,13 +580,15 @@ function disconnectPoint(s, ptIdx) {
   }
 }
 
-function tryConnectPoints(shapeId, ptIdx) {
+function tryConnectPoints(shapeId, ptIdx, skipConnect = false) {
   const s = shapes.find(x => x.id === shapeId);
   if (!s || s.closed) return false;
   
   const isStart = (ptIdx === 0);
   const isEnd = (ptIdx === s.points.length - 1);
   if (!isStart && !isEnd) return false;
+  
+  if (skipConnect) return false;
   
   if (s.points[ptIdx].connectedTo) {
     disconnectPoint(s, ptIdx);
@@ -549,20 +598,21 @@ function tryConnectPoints(shapeId, ptIdx) {
   const g = s.groupId ? groups.find(x => x.id === s.groupId) : null;
   const pWorld = g ? rotAround(p, circle.cx, circle.cy, g.rotation) : p;
   
-  // 1. Check self-intersection
+  let bestCandidate = null;
+  let bestDist = SNAP_D;
+
+  // 1. Check self-intersection (priority on ties)
   for (let i = 0; i < s.points.length; i++) {
     if (i === ptIdx) continue;
+    const isOtherEnd = (i === 0 || i === s.points.length - 1);
+    if (!isOtherEnd) continue;
+    
     const p2 = s.points[i];
     const p2World = g ? rotAround(p2, circle.cx, circle.cy, g.rotation) : p2;
-    if (Math.hypot(pWorld.x - p2World.x, pWorld.y - p2World.y) < SNAP_D) {
-      const isOtherEnd = (i === 0 || i === s.points.length - 1);
-      if (isOtherEnd) {
-        disconnectPoint(s, i);
-        s.points[ptIdx].connectedTo = { shapeId: s.id, ptIdx: i };
-        s.points[i].connectedTo = { shapeId: s.id, ptIdx: ptIdx };
-        s.points[ptIdx].x = p2.x; s.points[ptIdx].y = p2.y;
-        return true;
-      }
+    const d = Math.hypot(pWorld.x - p2World.x, pWorld.y - p2World.y);
+    if (d < bestDist) {
+      bestDist = d;
+      bestCandidate = { type: 'self', ptIdx: i, p2: p2, p2World: p2World };
     }
   }
 
@@ -578,21 +628,39 @@ function tryConnectPoints(shapeId, ptIdx) {
       if (s2.points[j].connectedTo) continue; // Only connect 1:1 to unconnected
       const p2 = s2.points[j];
       const p2World = g2 ? rotAround(p2, circle.cx, circle.cy, g2.rotation) : p2;
-      if (Math.hypot(pWorld.x - p2World.x, pWorld.y - p2World.y) < SNAP_D) {
-        s.points[ptIdx].connectedTo = { shapeId: s2.id, ptIdx: j };
-        s2.points[j].connectedTo = { shapeId: s.id, ptIdx: ptIdx };
-        const pWorldSnapped = g2 ? rotAround(s2.points[j], circle.cx, circle.cy, g2.rotation) : s2.points[j];
-        const pLocal = g ? rotAround(pWorldSnapped, circle.cx, circle.cy, -g.rotation) : pWorldSnapped;
-        s.points[ptIdx].x = pLocal.x; s.points[ptIdx].y = pLocal.y;
-        return true;
+      const d = Math.hypot(pWorld.x - p2World.x, pWorld.y - p2World.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestCandidate = { type: 'other', shape: s2, ptIdx: j, p2: p2, p2World: p2World, g2: g2 };
       }
+    }
+  }
+
+  if (bestCandidate) {
+    if (bestCandidate.type === 'self') {
+      disconnectPoint(s, bestCandidate.ptIdx);
+      s.points[ptIdx].connectedTo = { shapeId: s.id, ptIdx: bestCandidate.ptIdx };
+      s.points[bestCandidate.ptIdx].connectedTo = { shapeId: s.id, ptIdx: ptIdx };
+      s.points[ptIdx].x = bestCandidate.p2.x; 
+      s.points[ptIdx].y = bestCandidate.p2.y;
+      return true;
+    } else {
+      const s2 = bestCandidate.shape;
+      const j = bestCandidate.ptIdx;
+      s.points[ptIdx].connectedTo = { shapeId: s2.id, ptIdx: j };
+      s2.points[j].connectedTo = { shapeId: s.id, ptIdx: ptIdx };
+      const pWorldSnapped = bestCandidate.p2World;
+      const pLocal = g ? rotAround(pWorldSnapped, circle.cx, circle.cy, -g.rotation) : pWorldSnapped;
+      s.points[ptIdx].x = pLocal.x; 
+      s.points[ptIdx].y = pLocal.y;
+      return true;
     }
   }
   return false;
 }
 
 function getGroupShapeCount(groupId) {
-    const validShapes = shapes.filter(s => s.groupId === groupId && (groupId !== GROUP1_ID || !s._isCopy) && s.points && s.points.length >= 2);
+    const validShapes = shapes.filter(s => s.groupId === groupId && !(s.groupId === GROUP1_ID && !s._isCopy && typeof hasCopy === 'function' && hasCopy(s.id)) && s.points && s.points.length >= 2);
     const countedCCs = new Set();
     let count = 0;
     validShapes.forEach(s => {

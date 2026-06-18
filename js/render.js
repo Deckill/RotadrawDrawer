@@ -63,7 +63,7 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
   const isRoot = (Math.min(...cc) === s.id);
   
   if (isCCClosed(s.id)) {
-    if (isRoot && s.isHollow !== true) {
+    if (isRoot && isShapeFilled(s)) {
       const loop = getCCLoopPolyline(s.id);
       if (loop && loop.pts.length >= 2) {
         drawCtx.beginPath();
@@ -94,7 +94,7 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
       pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
       if(closed){
         drawCtx.closePath();
-        if (s.isHollow !== true) {
+        if (isShapeFilled(s)) {
           drawCtx.fillStyle=color;
           drawCtx.fill();
         }
@@ -115,7 +115,18 @@ function renderCircle(sc){
   ctx.save();
   ctx.strokeStyle='#4488ff77';ctx.lineWidth=1;ctx.setLineDash([5,5]);
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='#4488ffcc';ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();
+  
+  const hr = (centerHandleDiameter / 2) * sc;
+  ctx.strokeStyle = '#ff4444aa'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, hr, 0, Math.PI*2); ctx.stroke();
+  
+  const cl = 6;
+  ctx.beginPath();
+  ctx.moveTo(cx - cl, cy); ctx.lineTo(cx + cl, cy);
+  ctx.moveTo(cx, cy - cl); ctx.lineTo(cx, cy + cl);
+  ctx.stroke();
+  
+  ctx.fillStyle='#4488ffcc';ctx.beginPath();ctx.arc(cx,cy,2,0,Math.PI*2);ctx.fill();
   if(currentMode==='canvas'){
     ctx.strokeStyle='#4488ff44';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.stroke();
