@@ -48,7 +48,7 @@ function updatePropsPanel(){
   }
   const s=shapes.find(x=>x.id===selShapeId);if(!s)return;
   const g=s.groupId?groups.find(x=>x.id===s.groupId):null;
-  let h=`<b>${t('도형')} #${s.id}</b><br>${t('타입:')} ${s.type}<br>${t('두께:')} ${(s.strokeWidth||strokeWidth).toFixed(2)}mm<br>${t('그룹')}: ${g?t('그룹')+' '+g.label:t('없음')}<br>${t('점수:')} ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
+  let h=`<b>${t('도형')} #${s.id}</b><br>${t('타입:')} ${s.type}<br>${t('그룹')}: ${g?t('그룹')+' '+g.label:t('없음')}<br>${t('점:')} ${isShapeClosed(s)?s.points.length-1:s.points.length}`;
 
   if(selPtIdx!==null&&s.points[selPtIdx]){
     const p=s.points[selPtIdx];
@@ -229,7 +229,7 @@ function syncCopies(origShape) {
     s.points = JSON.parse(JSON.stringify(origShape.points));
     s.type = origShape.type;
     s.closed = origShape.closed;
-    s.strokeWidth = origShape.strokeWidth;
+    s.closed = origShape.closed;
     if (origShape.opacity !== undefined) s.opacity = origShape.opacity;
     if (origShape.isHollow !== undefined) s.isHollow = origShape.isHollow;
   });
@@ -300,18 +300,30 @@ function changeGroupColor(id, color) {
 
 function setGroupLabel(id,v){const g=groups.find(x=>x.id===id);if(g){g.label=parseInt(v)||g.label;render(); triggerAutosave();}}
 
-function onSwRange(v){
-  strokeWidth=parseFloat(v);
-  document.getElementById('sw-num').value=strokeWidth.toFixed(2);
-  shapes.forEach(s=>s.strokeWidth=strokeWidth);
+function onPenSwRange(v){
+  penThickness=parseFloat(v);
+  document.getElementById('pen-sw-num').value=penThickness.toFixed(2);
   render();
   triggerAutosave();
 }
 
-function onSwNum(v){
-  strokeWidth=Math.max(0.5,Math.min(2,parseFloat(v)||1));
-  document.getElementById('sw-range').value=strokeWidth;
-  shapes.forEach(s=>s.strokeWidth=strokeWidth);
+function onPenSwNum(v){
+  penThickness=Math.max(0.1,Math.min(5,parseFloat(v)||0.5));
+  document.getElementById('pen-sw-range').value=penThickness;
+  render();
+  triggerAutosave();
+}
+
+function onExpSwRange(v){
+  exportThickness=parseFloat(v);
+  document.getElementById('exp-sw-num').value=exportThickness.toFixed(2);
+  render();
+  triggerAutosave();
+}
+
+function onExpSwNum(v){
+  exportThickness=Math.max(0.1,Math.min(5,parseFloat(v)||1.1));
+  document.getElementById('exp-sw-range').value=exportThickness;
   render();
   triggerAutosave();
 }

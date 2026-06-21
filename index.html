@@ -135,10 +135,10 @@ M,l//1l,,,,<1/crcrrrrrrrrcrrrrr-,.,,l</cZZZJZZJZJrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
           <button class="panel-btn" id="circle-2pt" onclick="setCircleMode('circle2pt')" style="font-size: 10px; margin: 0; padding: 4px; flex: 1;" data-i18n="중심점 원">중심점 원</button>
         </div>
       </div>
-      <div class="panel-title" style="margin-top:8px" data-i18n="두께 (mm)">두께 (mm)</div>
+      <div class="panel-title" style="margin-top:8px" data-i18n="펜 두께 (mm)">펜 두께 (mm)</div>
       <div class="input-row">
-        <input type="range" id="sw-range" min="0.1" max="5" step="0.05" value="1" oninput="onSwRange(this.value)">
-        <input type="number" id="sw-num" value="1.00" min="0.1" max="5" step="0.05" style="width:52px;flex:none" oninput="onSwNum(this.value)">
+        <input type="range" id="pen-sw-range" min="0.1" max="5" step="0.05" value="0.5" oninput="onPenSwRange(this.value)">
+        <input type="number" id="pen-sw-num" value="0.5" min="0.1" max="5" step="0.05" style="width:52px;flex:none" oninput="onPenSwNum(this.value)">
       </div>
       <div class="panel-title" style="margin-top:8px" data-i18n="도형 불투명도">도형 불투명도</div>
       <div class="input-row">
@@ -174,8 +174,13 @@ M,l//1l,,,,<1/crcrrrrrrrrcrrrrr-,.,,l</cZZZJZZJZJrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
           <button class="panel-btn" id="drag-mode-handle" onclick="setArrDragMode('handle')" style="font-size:10px; margin:0; padding:4px; flex:1;" data-i18n="핸들 기준">핸들 기준</button>
         </div>
       </div>
-      <div class="panel-title" data-i18n="그룹">그룹</div>
-      <button class="panel-btn" onclick="addGroup()" data-i18n="새 그룹 생성">+ 그룹 추가</button>
+      <div class="panel-title" style="margin-top:8px" data-i18n="출력 두께 (mm)">출력 두께 (mm)</div>
+      <div class="input-row">
+        <input type="range" id="exp-sw-range" min="0.1" max="5" step="0.05" value="1.1" oninput="onExpSwRange(this.value)">
+        <input type="number" id="exp-sw-num" value="1.1" min="0.1" max="5" step="0.05" style="width:52px;flex:none" oninput="onExpSwNum(this.value)">
+      </div>
+      <div class="panel-title" style="margin-top:12px" data-i18n="그룹">그룹</div>
+      <button class="panel-btn" onclick="addGroup()" data-i18n="+ 그룹 추가">+ 그룹 추가</button>
       <div id="group-list" style="margin-top:6px"></div>
       <div style="margin-top:8px;font-size:10px;color:#555;line-height:1.7">
         <span data-i18n="help_arrange">클릭 도형의 그룹 선택<br>

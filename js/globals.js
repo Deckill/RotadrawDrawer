@@ -40,7 +40,13 @@ let shapes = [], nextShapeId = 1;
 let groups = [], nextGroupId = 2;
 let activeDrawGroupId = GROUP1_ID;
 let labels = {};
-let strokeWidth = 1.0;
+let penThickness = 0.5;
+let exportThickness = 1.1;
+
+function getCurrentStrokeWidth() {
+  return typeof currentMode !== 'undefined' && currentMode === 'draw' ? penThickness : exportThickness;
+}
+
 window.isHollowDefault = true;
 // View
 let viewScale = 1, viewOffX = 0, viewOffY = 0;

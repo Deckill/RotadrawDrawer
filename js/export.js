@@ -1,5 +1,5 @@
 async function saveProject(){
-  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
+  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,penThickness,exportThickness,bgColor:document.getElementById('cv-bg').value};
   const jsonStr = JSON.stringify(data, null, 2);
   
   if (window.showSaveFilePicker && currentFileHandle) {
@@ -24,7 +24,7 @@ async function saveProject(){
 }
 
 async function saveProjectAs(){
-  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,strokeWidth,bgColor:document.getElementById('cv-bg').value};
+  const data={version:4,canvasW,canvasH,baseW,baseH,circle,shapes,groups,nextGroupId,labels,penThickness,exportThickness,bgColor:document.getElementById('cv-bg').value};
   const jsonStr = JSON.stringify(data, null, 2);
   
   if (window.showSaveFilePicker) {
@@ -71,11 +71,21 @@ function applyProjectData(d){
     g1.locked = true;
   }
   nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
-  labels=d.labels||{};strokeWidth=d.strokeWidth||1;activeDrawGroupId=groups.find(g=>g.id===GROUP1_ID)?.id || groups[0].id;
+  labels=d.labels||{};
+  penThickness=d.penThickness||(d.strokeWidth||0.5);
+  exportThickness=d.exportThickness||(d.strokeWidth||1.1);
+  activeDrawGroupId=groups.find(g=>g.id===GROUP1_ID)?.id || groups[0].id;
+  updateUIAfterLoad();
+}
+
+function updateUIAfterLoad() {
+  document.getElementById('pen-sw-num').value=penThickness.toFixed(2);
+  document.getElementById('pen-sw-range').value=penThickness;
+  document.getElementById('exp-sw-num').value=exportThickness.toFixed(2);
+  document.getElementById('exp-sw-range').value=exportThickness;
   document.getElementById('cv-w').value=canvasW;document.getElementById('cv-h').value=canvasH;
   document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
   document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
-  document.getElementById('sw-num').value=strokeWidth.toFixed(2);document.getElementById('sw-range').value=strokeWidth;
   refreshGroupList();setCanvasSize();render();
   triggerAutosave();
 }
@@ -161,11 +171,11 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
           oc2.fillStyle = color;
           oc2.fill();
           oc2.strokeStyle = color;
-          oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+          oc2.lineWidth = exportThickness * mmScale;
           oc2.stroke();
         } else {
           oc2.strokeStyle = color;
-          oc2.lineWidth = (s.strokeWidth || strokeWidth) * mmScale;
+          oc2.lineWidth = exportThickness * mmScale;
           oc2.stroke();
         }
       }
@@ -514,7 +524,7 @@ function svgNativeOffsetPathD(s, rot, cx, cy, customScale = 96 / 25.4) {
     return svgNativeOffsetPathD(tempShape, rot, cx, cy, customScale);
   }
   const f = v => (v * customScale).toFixed(3);
-  const hw = (s.strokeWidth || strokeWidth) / 2;
+  const hw = exportThickness / 2;
   const closed = s.closed === true;
   
   const norm = (dx, dy) => {
@@ -699,7 +709,7 @@ function getNativeArcsAndCirclesForExport(s, rot, globalCx, globalCy) {
     addGeom(p);
   }
   
-  const hw = (s.strokeWidth || strokeWidth) / 2;
+  const hw = exportThickness / 2;
   if (p.type === 'circle') {
     addGeom({ ...p, r: p.r + hw });
     addGeom({ ...p, r: p.r - hw });
@@ -725,7 +735,7 @@ function getSvgNativeArcCirclePath(s, rot, globalCx, globalCy) {
   const rotRad = rot * Math.PI / 180;
   
   if (p.type === 'circle') {
-    const hw = (s.strokeWidth || strokeWidth) / 2;
+    const hw = exportThickness / 2;
     const ro = p.r + hw;
     const ri = p.r - hw;
     const cx = pRot.x, cy = pRot.y;
@@ -735,7 +745,7 @@ function getSvgNativeArcCirclePath(s, rot, globalCx, globalCy) {
   }
   
   if (p.type === 'arc') {
-    const hw = (s.strokeWidth || strokeWidth) / 2;
+    const hw = exportThickness / 2;
     const ro = p.r + hw;
     const ri = p.r - hw;
     const cx = pRot.x, cy = pRot.y;

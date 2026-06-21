@@ -81,7 +81,7 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
       pts.slice(1).forEach(p=>drawCtx.lineTo(p.x*sc,p.y*sc));
       if (s.closed) drawCtx.closePath();
       drawCtx.strokeStyle=color;
-      drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.lineWidth = getCurrentStrokeWidth() * sc;
       drawCtx.lineJoin = 'round';
       drawCtx.lineCap = 'round';
       drawCtx.stroke();
@@ -100,7 +100,7 @@ function renderShape(s,sc,isPreview=false,customCtx=null){
         }
       }
       drawCtx.strokeStyle=color;
-      drawCtx.lineWidth=(s.strokeWidth||strokeWidth)*sc;
+      drawCtx.lineWidth = getCurrentStrokeWidth() * sc;
       drawCtx.lineJoin = 'round';
       drawCtx.lineCap = 'round';
       drawCtx.stroke();

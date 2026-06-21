@@ -180,7 +180,7 @@ function buildOffsetPath(pts, closed, hw, sc) {
 function getShapePath(s,sc){
   const{pts,closed}=getPolyline(s);
   if(pts.length<2)return null;
-  return buildOffsetPath(pts,closed,(s.strokeWidth||strokeWidth)/2,sc);
+  return buildOffsetPath(pts,closed,getCurrentStrokeWidth()/2,sc);
 }
 
 function segDist(p,a,b){
@@ -346,7 +346,7 @@ function distToShape(pos,s){
   let md=Infinity;
   for(let j=0;j<pts.length-1;j++)md=Math.min(md,segDist(pLocal,pts[j],pts[j+1]));
   if(isShapeClosed(s)&&pts.length>2)md=Math.min(md,segDist(pLocal,pts[pts.length-1],pts[0]));
-  return Math.max(0,md-(s.strokeWidth||strokeWidth)/2);
+  return Math.max(0,md-getCurrentStrokeWidth()/2);
 }
 
 function distToCCPolyline(pLocal, loopPolyline) {
