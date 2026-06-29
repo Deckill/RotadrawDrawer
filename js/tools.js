@@ -189,7 +189,7 @@ function mDrawDown(pos,e){
     
     let isClosed = (drawTool === 'circle'); // 원은 기본적으로 닫힘, 호는 열림
     
-    drawingShape={id:nextShapeId++,type:finalType,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth',noSnap:snapOff}],closed:isClosed,isHollow:(window.isHollowDefault!==false),strokeWidth,groupId:GROUP1_ID};
+    drawingShape={id:nextShapeId++,type:finalType,points:[{x:sx,y:sy,inT:{x:0,y:0},outT:{x:0,y:0},mode:'smooth',noSnap:snapOff}],closed:isClosed,isHollow:(window.isHollowDefault!==false),groupId:GROUP1_ID};
     drawing=true;
   } else {
     const p0=drawingShape.points[0];

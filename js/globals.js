@@ -71,7 +71,7 @@ function _snapState() {
     circle: {...circle},
     canvasW, canvasH, baseW, baseH,
     labels: JSON.parse(JSON.stringify(labels)),
-    strokeWidth, nextShapeId, nextGroupId,
+    penThickness, exportThickness, nextShapeId, nextGroupId,
     paperGuide: JSON.parse(JSON.stringify(paperGuide))
   });
 }
@@ -87,7 +87,7 @@ function _applySnap(snap) {
   shapes = d.shapes; groups = d.groups; circle = d.circle;
   canvasW = d.canvasW; canvasH = d.canvasH;
   baseW = d.baseW||canvasW; baseH = d.baseH||canvasH;
-  labels = d.labels||{}; strokeWidth = d.strokeWidth;
+  labels = d.labels||{}; penThickness = d.penThickness||0.5; exportThickness = d.exportThickness||1.1;
   nextShapeId = d.nextShapeId; nextGroupId = d.nextGroupId;
   if (d.paperGuide) Object.assign(paperGuide, d.paperGuide);
   selShapeId=null; selPtIdx=null; dragState=null;
@@ -96,8 +96,10 @@ function _applySnap(snap) {
     document.getElementById('cv-w').value = canvasW;
     document.getElementById('cv-h').value = canvasH;
     document.getElementById('circle-d').value = (circle.r*2).toFixed(1);
-    document.getElementById('sw-num').value = strokeWidth.toFixed(2);
-    document.getElementById('sw-range').value = strokeWidth;
+    document.getElementById('pen-sw-num').value = penThickness.toFixed(2);
+    document.getElementById('pen-sw-range').value = penThickness;
+    document.getElementById('exp-sw-num').value = exportThickness.toFixed(2);
+    document.getElementById('exp-sw-range').value = exportThickness;
   } catch(e2) {}
   refreshGroupList();
   setCanvasSize();
@@ -421,14 +423,14 @@ function svgPathD(s){
     const closed=isShapeClosed(s);
     const rawPts=s.points;
     const rn=rawPts.length;if(rn<2)return null;
-    const hw=(s.strokeWidth||strokeWidth)/2;
+    const hw=getCurrentStrokeWidth()/2;
     // Sample polyline then build offset
     const{pts}=getPolyline(s);
     return svgOffsetPathD(pts,closed,hw);
   }
   const{pts,closed}=getPolyline(s);
   if(pts.length<2)return null;
-  return svgOffsetPathD(pts,closed,(s.strokeWidth||strokeWidth)/2);
+  return svgOffsetPathD(pts,closed,getCurrentStrokeWidth()/2);
 }
 
 
@@ -454,7 +456,7 @@ function triggerAutosave() {
       groups,
       nextGroupId,
       labels,
-      strokeWidth,
+      penThickness, exportThickness,
       bgColor: document.getElementById('cv-bg').value
     };
     localStorage.setItem('rotadraw_autosave', JSON.stringify(data));

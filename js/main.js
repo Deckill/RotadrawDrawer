@@ -294,14 +294,18 @@ function loadAutosave() {
           g1.locked = true;
         }
         nextGroupId=d.nextGroupId||groups.reduce((m,g)=>Math.max(m,g.id+1),2);
-        labels=d.labels||{};strokeWidth=d.strokeWidth||1;
+        labels=d.labels||{};
+        penThickness=d.penThickness||(d.strokeWidth||0.5);
+        exportThickness=d.exportThickness||(d.strokeWidth||1.1);
         
         document.getElementById('cv-w').value=canvasW;
         document.getElementById('cv-h').value=canvasH;
         document.getElementById('cv-bg').value=d.bgColor||'#ffffff';
         document.getElementById('circle-d').value=(circle.r*2).toFixed(1);
-        document.getElementById('sw-num').value=strokeWidth.toFixed(2);
-        document.getElementById('sw-range').value=strokeWidth;
+        document.getElementById('pen-sw-num').value=penThickness.toFixed(2);
+        document.getElementById('pen-sw-range').value=penThickness;
+        document.getElementById('exp-sw-num').value=exportThickness.toFixed(2);
+        document.getElementById('exp-sw-range').value=exportThickness;
         
         refreshGroupList();
         setCanvasSize();

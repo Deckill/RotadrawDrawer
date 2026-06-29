@@ -75,10 +75,10 @@ function applyProjectData(d){
   penThickness=d.penThickness||(d.strokeWidth||0.5);
   exportThickness=d.exportThickness||(d.strokeWidth||1.1);
   activeDrawGroupId=groups.find(g=>g.id===GROUP1_ID)?.id || groups[0].id;
-  updateUIAfterLoad();
+  updateUIAfterLoad(d);
 }
 
-function updateUIAfterLoad() {
+function updateUIAfterLoad(d) {
   document.getElementById('pen-sw-num').value=penThickness.toFixed(2);
   document.getElementById('pen-sw-range').value=penThickness;
   document.getElementById('exp-sw-num').value=exportThickness.toFixed(2);
@@ -281,7 +281,28 @@ function renderOffscreen(mmScale, exportTarget = 'all') {
     oc2.setLineDash([5 * mmScale, 5 * mmScale]);
     oc2.beginPath(); oc2.arc(circleCx, circleCy, circleR, 0, Math.PI*2); oc2.stroke();
     oc2.setLineDash([]);
-    oc2.fillStyle = '#4488ffcc'; oc2.beginPath(); oc2.arc(circleCx, circleCy, 2.5 * mmScale, 0, Math.PI*2); oc2.fill();
+    
+    oc2.strokeStyle = '#ff4444aa';
+    oc2.lineWidth = 0.5 * mmScale;
+    oc2.beginPath();
+    oc2.arc(circleCx, circleCy, (centerHandleDiameter/2) * mmScale, 0, Math.PI*2);
+    oc2.stroke();
+
+    oc2.beginPath();
+    oc2.moveTo(circleCx - 6 * mmScale, circleCy);
+    oc2.lineTo(circleCx + 6 * mmScale, circleCy);
+    oc2.moveTo(circleCx, circleCy - 6 * mmScale);
+    oc2.lineTo(circleCx, circleCy + 6 * mmScale);
+    oc2.stroke();
+
+    oc2.fillStyle = '#4488ffcc';
+    oc2.strokeStyle = '#4488ff';
+    oc2.lineWidth = 0.4 * mmScale;
+    oc2.beginPath(); 
+    oc2.arc(circleCx, circleCy, 2 * mmScale, 0, Math.PI*2); 
+    oc2.fill();
+    oc2.stroke();
+
     oc2.restore();
     
     // 그룹 마커 핸들 오프스크린 렌더링
